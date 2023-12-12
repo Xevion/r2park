@@ -112,6 +112,20 @@ func FilterLocations(all_locations []Location, query string, limit int, seed_val
 		return randomized
 	}
 
+	lower_query := strings.ToLower(query)
 	filtered_locations := make([]Location, 0, limit)
+	matches := 0
+
+	for _, location := range all_locations {
+		if strings.Contains(strings.ToLower(location.name), lower_query) {
+			filtered_locations = append(filtered_locations, location)
+			matches++
+
+			if matches >= limit {
+				break
+			}
+		}
+	}
+
 	return filtered_locations
 }
