@@ -97,8 +97,9 @@ type Location struct {
 }
 
 var (
-	cachedLocations []Location
-	cacheExpiry     time.Time
+	cachedLocations    []Location
+	cachedLocationsMap map[uint]Location
+	cacheExpiry        time.Time
 )
 
 func init() {
@@ -129,21 +130,25 @@ func GetLocations() []Location {
 		return nil
 	}
 
-	locations := make([]Location, 0, 150)
+	cachedLocations := make([]Location, 0, 150)
 
 	doc.Find("input.property").Each(func(i int, s *goquery.Selection) {
 		matches := parsePattern.FindStringSubmatch(s.Parent().Text())
 		id, _ := strconv.ParseUint(matches[3], 10, 32)
 
-		locations = append(locations, Location{
+		cachedLocations = append(cachedLocations, Location{
 			id:      uint(id),
 			name:    matches[1],
 			address: matches[2],
 		})
 	})
 
-	cachedLocations = locations
+	// Build the map
+	cachedLocationsMap = make(map[uint]Location, len(cachedLocations))
+	for _, location := range cachedLocations {
+		cachedLocationsMap[location.id] = location
+	}
 	cacheExpiry = time.Now().Add(time.Hour * 3)
 
-	return locations
+	return cachedLocations
 }
