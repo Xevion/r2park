@@ -13,13 +13,17 @@ import (
 )
 
 var (
-	client         *http.Client
-	requestCounter uint
-	lastReload     int64
-	parsePattern   = regexp.MustCompile("\\s*(.+)\\n\\s+(.+)\\n\\s+(\\d+)\\s*")
+	client             *http.Client
+	requestCounter     uint
+	lastReload         int64
+	parsePattern       = regexp.MustCompile(`\s*(.+)\n\s+(.+)\n\s+(\d+)\s*`)
+	cachedLocations    []Location
+	cachedLocationsMap map[uint]Location
+	cacheExpiry        time.Time
 )
 
 func init() {
+	cacheExpiry = time.Now().Add(-time.Second) // Set the cache as expired initially
 	cookies, err := cookiejar.New(nil)
 	if err != nil {
 		log.Fatal(err)
@@ -88,22 +92,6 @@ func tryReload(name string) {
 
 func register(location uint, code string, make string, model string, plate string) {
 
-}
-
-type Location struct {
-	id      uint   // Used for registration internally
-	name    string // Used for autocomplete & location selection
-	address string // Not used in this application so far
-}
-
-var (
-	cachedLocations    []Location
-	cachedLocationsMap map[uint]Location
-	cacheExpiry        time.Time
-)
-
-func init() {
-	cacheExpiry = time.Now().Add(-time.Second) // Set the cache as expired initially
 }
 
 func GetLocations() []Location {

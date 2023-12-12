@@ -24,7 +24,7 @@ func DebugRequest(req *http.Request) string {
 			str += fmt.Sprintf("\n\n {error while reading request body buffer: %s}", err)
 		} else {
 			if len(body) == 0 {
-				str += fmt.Sprintf("\n\n{empty body}")
+				str += "\n\n{empty body}"
 			} else {
 				str += fmt.Sprintf("\n\n%s", body)
 			}
