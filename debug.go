@@ -23,7 +23,11 @@ func DebugRequest(req *http.Request) string {
 		if err != nil {
 			str += fmt.Sprintf("\n\n {error while reading request body buffer: %s}", err)
 		} else {
-			str += fmt.Sprintf("\n\n%s", body)
+			if len(body) == 0 {
+				str += fmt.Sprintf("\n\n{empty body}")
+			} else {
+				str += fmt.Sprintf("\n\n%s", body)
+			}
 		}
 	}
 
@@ -32,7 +36,6 @@ func DebugRequest(req *http.Request) string {
 
 func DebugResponse(res *http.Response) string {
 	str := fmt.Sprintf("[%s %s]", res.Status, res.Request.URL.String())
-
 	// Add all headers
 	for header_name, header_values := range res.Header {
 		for _, header_value := range header_values {
@@ -47,7 +50,11 @@ func DebugResponse(res *http.Response) string {
 		if err != nil {
 			str += fmt.Sprintf("\n\n {error while reading response body buffer: %s}", err)
 		} else {
-			str += fmt.Sprintf("\n\n%s", body)
+			if len(body) == 0 {
+				str += "\n\n{empty body}"
+			} else {
+				str += fmt.Sprintf("\n\n%s", body)
+			}
 		}
 	}
 
