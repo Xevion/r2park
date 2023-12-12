@@ -76,10 +76,12 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		var choices []*discordgo.ApplicationCommandOptionChoice
 
 		if data.Options[0].Focused {
-			locations := GetLocations()
-			log.Printf("%d location%s provided", len(locations), Plural(len(locations)))
+			// Seed value is based on the user ID + a 15 minute interval)
+			user_id, _ := strconv.Atoi(interaction.Member.User.ID)
+			seed_value := int64(user_id) + (time.Now().Unix() / 15 * 60)
+			locations := FilterLocations(GetLocations(), data.Options[0].StringValue(), 25, seed_value)
 
-			choices = make([]*discordgo.ApplicationCommandOptionChoice, min(len(locations), 25))
+			choices = make([]*discordgo.ApplicationCommandOptionChoice, len(locations))
 			for i, location := range locations {
 				choices[i] = &discordgo.ApplicationCommandOptionChoice{
 					Name:  location.name,
@@ -154,6 +156,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot open the session: %v", err)
 	}
+	defer session.Close()
+	defer client.CloseIdleConnections()
 
 	session.AddHandler(func(internalSession *discordgo.Session, interaction *discordgo.InteractionCreate) {
 		if handler, ok := commandHandlers[interaction.ApplicationCommandData().Name]; ok {
@@ -170,8 +174,6 @@ func main() {
 		}
 		registeredCommands[definitionIndex] = command
 	}
-
-	defer session.Close()
 
 	tryReload("")
 
