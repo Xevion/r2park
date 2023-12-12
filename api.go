@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
-	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -16,6 +16,7 @@ var (
 	client         *http.Client
 	requestCounter uint
 	lastReload     int64
+	parsePattern   = regexp.MustCompile("\\s*(.+)\\n\\s+(.+)\\n\\s+(\\d+)\\s*")
 )
 
 func init() {
@@ -46,6 +47,15 @@ func reload(name string) {
 	req := BuildRequest("GET", "/", nil)
 	onRequest(req)
 	res, _ := client.Do(req)
+	onResponse(res)
+
+	// Ring the second doorbell (seems to be a way of validating whether a client is a 'browser' or not)
+	req = BuildRequest("GET", "/index.php", map[string]string{
+		"width":  "1920",
+		"height": "1080",
+	})
+	onRequest(req)
+	res, _ = client.Do(req)
 	onResponse(res)
 
 	// TODO: Verify that a PHPSESSID cookie is present
@@ -102,25 +112,16 @@ func GetLocations() []Location {
 
 	tryReload("")
 
-	body := "propertyNameEntered="
-	req := BuildRequestWithBody("GET", "/register-get-properties-from-name", nil, bytes.NewBufferString(body))
+	body := "propertyNameEntered=" // Empty, so we get all locations
+	req := BuildRequestWithBody("POST", "/register-get-properties-from-name", nil, bytes.NewBufferString(body))
 	SetTypicalHeaders(req, nil, nil, true)
 
 	onRequest(req)
 	res, err := client.Do(req)
-	fmt.Println(DebugRequest(res.Request))
 	onResponse(res)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// print response body
-	response_body, err := io.ReadAll(res.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(DebugResponse(res))
-	fmt.Printf("%s\n", response_body)
 
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
@@ -130,10 +131,19 @@ func GetLocations() []Location {
 
 	locations := make([]Location, 0, 150)
 
-	// Find all input.property
 	doc.Find("input.property").Each(func(i int, s *goquery.Selection) {
-		log.Printf("%s", s.Text())
+		matches := parsePattern.FindStringSubmatch(s.Parent().Text())
+		id, _ := strconv.ParseUint(matches[3], 10, 32)
+
+		locations = append(locations, Location{
+			id:      uint(id),
+			name:    matches[1],
+			address: matches[2],
+		})
 	})
+
+	cachedLocations = locations
+	cacheExpiry = time.Now().Add(time.Hour * 3)
 
 	return locations
 }
