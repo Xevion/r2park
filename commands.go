@@ -42,9 +42,9 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 		// TODO: Validate that the location exists
 		// TODO: Validate that the code has no invalid characters
 		already_set := StoreCode(code, int64(location_id), user_id)
-		responseText := "Your guest code at %d has been set."
+		responseText := "Your guest code at \"%s\" has been set."
 		if already_set {
-			responseText = "Your guest code %d has been updated."
+			responseText = "Your guest code at \"%s\" has been updated."
 		}
 
 		location := cachedLocationsMap[uint(location_id)]
