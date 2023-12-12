@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"time"
@@ -34,13 +35,19 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 	case discordgo.InteractionApplicationCommand:
 		data := interaction.ApplicationCommandData()
 
-		location := data.Options[0].IntValue()
+		location_id, _ := strconv.Atoi(data.Options[0].StringValue())
 		code := data.Options[1].StringValue()
 		user_id, _ := strconv.Atoi(interaction.Member.User.ID)
 
 		// TODO: Validate that the location exists
 		// TODO: Validate that the code has no invalid characters
-		StoreCode(code, location, user_id)
+		already_set := StoreCode(code, int64(location_id), user_id)
+		responseText := "Your guest code at %d has been set."
+		if already_set {
+			responseText = "Your guest code %d has been updated."
+		}
+
+		location := cachedLocationsMap[uint(location_id)]
 
 		session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -50,7 +57,7 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 						Footer: &discordgo.MessageEmbedFooter{
 							Text: GetFooterText(),
 						},
-						Description: "Your guest code has been registered.",
+						Description: fmt.Sprintf(responseText, location.name),
 						Fields:      []*discordgo.MessageEmbedField{},
 					},
 				},
