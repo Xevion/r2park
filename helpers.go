@@ -1,8 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"log"
+	"math/rand"
 	"net/http"
+	"reflect"
 	"strings"
 )
 
@@ -69,4 +73,45 @@ func SetTypicalHeaders(req *http.Request, contentType *string, referrer *string,
 	} else {
 		req.Header.Set("Referer", *referrer)
 	}
+}
+
+func GetRandomItems[T any](arr []T, N int, seed_value int64) ([]T, error) {
+	randgen := rand.New(rand.NewSource(seed_value))
+	arrValue := reflect.ValueOf(arr)
+
+	if arrValue.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("input is not a slice")
+	}
+
+	if arrValue.Len() < N {
+		return nil, fmt.Errorf("array length is less than N")
+	}
+
+	selectedIndices := make(map[int]bool)
+	selectedItems := make([]T, 0, N)
+
+	for len(selectedItems) < N {
+		randomIndex := randgen.Intn(arrValue.Len())
+
+		// Check if the index is not already selected
+		if !selectedIndices[randomIndex] {
+			selectedIndices[randomIndex] = true
+			selectedItems = append(selectedItems, arrValue.Index(randomIndex).Interface().(T))
+		}
+	}
+
+	return selectedItems, nil
+}
+
+func FilterLocations(all_locations []Location, query string, limit int, seed_value int64) []Location {
+	if len(query) == 0 {
+		randomized, err := GetRandomItems(all_locations, limit, seed_value)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return randomized
+	}
+
+	filtered_locations := make([]Location, 0, limit)
+	return filtered_locations
 }
