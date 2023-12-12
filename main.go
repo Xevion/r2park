@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
@@ -49,8 +52,54 @@ var RegisterCommandDefinition = &discordgo.ApplicationCommand{
 	},
 }
 
-func RegisterCommandHandler(s *discordgo.Session, m *discordgo.InteractionCreate) {
+func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	switch interaction.Type {
+	case discordgo.InteractionApplicationCommand:
+		session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Embeds: []*discordgo.MessageEmbed{
+					{
+						Footer: &discordgo.MessageEmbedFooter{
+							Text: fmt.Sprintf("Fetched at %s", time.Now().Format("Monday, January 2, 2006 at 3:04:05PM")),
+						},
+						Description: "",
+						Fields:      []*discordgo.MessageEmbedField{},
+					},
+				},
+				AllowedMentions: &discordgo.MessageAllowedMentions{},
+			},
+		})
+	case discordgo.InteractionApplicationCommandAutocomplete:
+		data := interaction.ApplicationCommandData()
 
+		var choices []*discordgo.ApplicationCommandOptionChoice
+
+		if data.Options[0].Focused {
+			locations := GetLocations()
+			log.Printf("%d location%s provided", len(locations), Plural(len(locations)))
+
+			choices = make([]*discordgo.ApplicationCommandOptionChoice, min(len(locations), 25))
+			for i, location := range locations {
+				choices[i] = &discordgo.ApplicationCommandOptionChoice{
+					Name:  location.name,
+					Value: strconv.Itoa(int(location.id)),
+				}
+			}
+		} else {
+			choices = []*discordgo.ApplicationCommandOptionChoice{}
+		}
+
+		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionApplicationCommandAutocompleteResult,
+			Data: &discordgo.InteractionResponseData{
+				Choices: choices, // This is basically the whole purpose of autocomplete interaction - return custom options to the user.
+			},
+		})
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 // func test() {
@@ -114,15 +163,17 @@ func main() {
 
 	log.Printf("Adding %d command%s...", len(commandDefinitions), Plural(len(commandDefinitions)))
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commandDefinitions))
-	for i, v := range commandDefinitions {
-		cmd, err := session.ApplicationCommandCreate(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), v)
+	for definitionIndex, commandDefinition := range commandDefinitions {
+		command, err := session.ApplicationCommandCreate(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), commandDefinition)
 		if err != nil {
-			log.Panicf("Cannot create '%v' command: %v", v.Name, err)
+			log.Panicf("Failed while registering '%v' command: %v", commandDefinition.Name, err)
 		}
-		registeredCommands[i] = cmd
+		registeredCommands[definitionIndex] = command
 	}
 
 	defer session.Close()
+
+	tryReload("")
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
