@@ -7,7 +7,9 @@ import (
 	"math/rand"
 	"net/http"
 	"reflect"
+	"runtime/debug"
 	"strings"
+	"time"
 )
 
 const baseURL = "https://www.register2park.com"
@@ -137,4 +139,23 @@ func FilterLocations(all_locations []Location, query string, limit int, seed_val
 	}
 
 	return filtered_locations
+}
+
+// The commit ID from the Git repository. Only valid at build time, but is compiled into the binary.
+var CommitId = func() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, setting := range info.Settings {
+			if setting.Key == "vcs.revision" {
+				return setting.Value
+			}
+		}
+	}
+
+	return strings.Repeat("gubed", 8) // 40 characters
+}()
+
+func GetFooterText() string {
+	return fmt.Sprintf("Fetched at %s @%s",
+		time.Now().Format("Monday, January 2, 2006 at 3:04:05PM"),
+		strings.ToLower(CommitId[:7]))
 }

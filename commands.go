@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
@@ -49,7 +48,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 				Embeds: []*discordgo.MessageEmbed{
 					{
 						Footer: &discordgo.MessageEmbedFooter{
-							Text: fmt.Sprintf("Fetched at %s", time.Now().Format("Monday, January 2, 2006 at 3:04:05PM")),
+							Text: GetFooterText(),
 						},
 						Description: "",
 						Fields:      []*discordgo.MessageEmbedField{},
@@ -60,15 +59,20 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		})
 	case discordgo.InteractionApplicationCommandAutocomplete:
 		data := interaction.ApplicationCommandData()
-
 		var choices []*discordgo.ApplicationCommandOptionChoice
 
-		if data.Options[0].Focused {
+		LocationOption := data.Options[0]
+		MakeOption := data.Options[1]
+		ModelOption := data.Options[2]
+
+		switch {
+		case LocationOption.Focused:
 			// Seed value is based on the user ID + a 15 minute interval)
 			user_id, _ := strconv.Atoi(interaction.Member.User.ID)
 			seed_value := int64(user_id) + (time.Now().Unix() / 15 * 60)
 			locations := FilterLocations(GetLocations(), data.Options[0].StringValue(), 25, seed_value)
 
+			// Convert the locations to choices
 			choices = make([]*discordgo.ApplicationCommandOptionChoice, len(locations))
 			for i, location := range locations {
 				choices[i] = &discordgo.ApplicationCommandOptionChoice{
@@ -76,8 +80,9 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 					Value: strconv.Itoa(int(location.id)),
 				}
 			}
-		} else {
-			choices = []*discordgo.ApplicationCommandOptionChoice{}
+		case MakeOption.Focused:
+
+		case ModelOption.Focused:
 		}
 
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
