@@ -6,15 +6,18 @@ import (
 	"os/signal"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
 )
 
 var (
 	session            *discordgo.Session
-	commandDefinitions = []*discordgo.ApplicationCommand{RegisterCommandDefinition}
+	commandDefinitions = []*discordgo.ApplicationCommand{RegisterCommandDefinition, CodeCommandDefinition}
 	commandHandlers    = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"register": RegisterCommandHandler,
+		"code":     CodeCommandHandler,
 	}
+	db *redis.Client
 )
 
 func main() {
@@ -23,7 +26,19 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	session, err := discordgo.New("Bot " + os.Getenv("BOT_TOKEN"))
+	opt := &redis.Options{
+		Addr:     os.Getenv("REDIS_HOST"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+	}
+	db = redis.NewClient(opt)
+
+	ping_result, err := db.Ping().Result()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Redis connection established (%s).", ping_result)
+
+	session, err = discordgo.New("Bot " + os.Getenv("BOT_TOKEN"))
 	if err != nil {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
