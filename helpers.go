@@ -13,8 +13,9 @@ func BuildRequestWithBody(method string, path string, params map[string]string, 
 	var url string
 	if !strings.HasPrefix(path, "http") {
 		url = baseURL + path
+	} else {
+		url = path
 	}
-	url = path
 
 	if params != nil {
 		takenFirst := false
@@ -30,7 +31,8 @@ func BuildRequestWithBody(method string, path string, params map[string]string, 
 	}
 
 	request, _ := http.NewRequest(method, url, body)
-	AddUserAgent(request)
+	SetTypicalHeaders(request, nil, nil, false)
+
 	return request
 }
 
@@ -38,13 +40,33 @@ func BuildRequest(method string, path string, params map[string]string) *http.Re
 	return BuildRequestWithBody(method, path, params, nil)
 }
 
-func AddUserAgent(req *http.Request) {
-	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
-}
-
 func Plural(n int) string {
 	if n == 1 {
 		return ""
 	}
 	return "s"
+}
+
+// Sets User-Agent, Host, Content-Type, and Referer headers on the given request.
+// If contentType is empty, "application/x-www-form-urlencoded; charset=UTF-8" is used.
+// If referrer is empty, "https://www.register2park.com/register" is used.
+// If xmlRequest is true, "X-Requested-With" is set to "XMLHttpRequest".
+func SetTypicalHeaders(req *http.Request, contentType *string, referrer *string, xmlRequest bool) {
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
+
+	if xmlRequest {
+		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	}
+
+	if contentType == nil {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+	} else {
+		req.Header.Set("Content-Type", *contentType)
+	}
+
+	if referrer == nil {
+		req.Header.Set("Referer", "https://www.register2park.com/register")
+	} else {
+		req.Header.Set("Referer", *referrer)
+	}
 }
