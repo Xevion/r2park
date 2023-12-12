@@ -123,11 +123,14 @@ func GetLocations() []Location {
 
 	doc.Find("input.property").Each(func(i int, s *goquery.Selection) {
 		matches := parsePattern.FindStringSubmatch(s.Parent().Text())
+
+		key_attr, _ := s.Attr("data-locate-key")
 		id_attr, _ := s.Attr("value")
 		id, _ := strconv.ParseUint(id_attr, 10, 32)
 
 		cachedLocations = append(cachedLocations, Location{
 			id:      uint(id),
+			key:     key_attr,
 			name:    matches[1],
 			address: matches[2] + " " + matches[3],
 		})
