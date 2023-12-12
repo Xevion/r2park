@@ -44,6 +44,8 @@ func BuildRequest(method string, path string, params map[string]string) *http.Re
 	return BuildRequestWithBody(method, path, params, nil)
 }
 
+// Plural returns an empty string if n is 1, otherwise it returns an "s".
+// This is useful for pluralizing words in a sentence.
 func Plural(n int) string {
 	if n == 1 {
 		return ""
@@ -75,6 +77,9 @@ func SetTypicalHeaders(req *http.Request, contentType *string, referrer *string,
 	}
 }
 
+// GetRandomItems returns N random items from the given array.
+// The seed_value is used to control the output.
+// If the array is not a slice, an error is returned.
 func GetRandomItems[T any](arr []T, N int, seed_value int64) ([]T, error) {
 	randgen := rand.New(rand.NewSource(seed_value))
 	arrValue := reflect.ValueOf(arr)
@@ -103,6 +108,10 @@ func GetRandomItems[T any](arr []T, N int, seed_value int64) ([]T, error) {
 	return selectedItems, nil
 }
 
+// FilterLocations filters the given locations by the given query.
+// If the query is empty, the locations are randomized. A seed value is used to control this output.
+// If the query is not empty, the locations are filtered by the query.
+// The limit parameter controls the maximum number of locations to return in all cases.
 func FilterLocations(all_locations []Location, query string, limit int, seed_value int64) []Location {
 	if len(query) == 0 {
 		randomized, err := GetRandomItems(all_locations, limit, seed_value)
