@@ -103,15 +103,16 @@ var (
 )
 
 func init() {
-	cacheExpiry = time.Now().Add(time.Hour * 24)
+	cacheExpiry = time.Now().Add(-time.Second) // Set the cache as expired initially
 }
 
 func GetLocations() []Location {
-	if len(cachedLocations) > 0 && time.Now().Before(cacheExpiry) {
+	if time.Now().Before(cacheExpiry) {
 		return cachedLocations
 	}
 
 	tryReload("")
+	log.Printf("Refetching locations (%s since refresh)", time.Now().Sub(cacheExpiry))
 
 	body := "propertyNameEntered=" // Empty, so we get all locations
 	req := BuildRequestWithBody("POST", "/register-get-properties-from-name", nil, bytes.NewBufferString(body))
@@ -130,16 +131,17 @@ func GetLocations() []Location {
 		return nil
 	}
 
-	cachedLocations := make([]Location, 0, 150)
+	cachedLocations = make([]Location, 0, 150)
 
 	doc.Find("input.property").Each(func(i int, s *goquery.Selection) {
 		matches := parsePattern.FindStringSubmatch(s.Parent().Text())
-		id, _ := strconv.ParseUint(matches[3], 10, 32)
+		id_attr, _ := s.Attr("value")
+		id, _ := strconv.ParseUint(id_attr, 10, 32)
 
 		cachedLocations = append(cachedLocations, Location{
 			id:      uint(id),
 			name:    matches[1],
-			address: matches[2],
+			address: matches[2] + " " + matches[3],
 		})
 	})
 
@@ -148,7 +150,7 @@ func GetLocations() []Location {
 	for _, location := range cachedLocations {
 		cachedLocationsMap[location.id] = location
 	}
-	cacheExpiry = time.Now().Add(time.Hour * 3)
+	cacheExpiry = time.Now().Add(time.Hour * 8) // Cache for 8 hours
 
 	return cachedLocations
 }
