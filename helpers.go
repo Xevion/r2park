@@ -155,7 +155,7 @@ var CommitId = func() string {
 }()
 
 func GetFooterText() string {
-	return fmt.Sprintf("Fetched at %s @%s",
-		time.Now().Format("Monday, January 2, 2006 at 3:04:05PM"),
+	return fmt.Sprintf("%s (#%s)",
+		time.Now().Format("Jan 2, 2006 3:04:05PM"),
 		strings.ToLower(CommitId[:7]))
 }
