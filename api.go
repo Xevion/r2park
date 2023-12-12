@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"time"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 var (
 	client         *http.Client
-	cookies        *cookiejar.Jar
 	requestCounter uint
 	lastReload     int64
 )
@@ -19,7 +23,6 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	client = &http.Client{Jar: cookies}
 }
 
@@ -44,10 +47,6 @@ func reload(name string) {
 	onRequest(req)
 	res, _ := client.Do(req)
 	onResponse(res)
-
-	// This request provides a PHPSESSID cookie
-	req = BuildRequest("GET", "https://api.parkingsnap.com/supportedLanguages?target=en&siteName=", nil)
-	client.Do(req)
 
 	// TODO: Verify that a PHPSESSID cookie is present
 
@@ -79,4 +78,62 @@ func tryReload(name string) {
 
 func register(location uint, code string, make string, model string, plate string) {
 
+}
+
+type Location struct {
+	id      uint   // Used for registration internally
+	name    string // Used for autocomplete & location selection
+	address string // Not used in this application so far
+}
+
+var (
+	cachedLocations []Location
+	cacheExpiry     time.Time
+)
+
+func init() {
+	cacheExpiry = time.Now().Add(time.Hour * 24)
+}
+
+func GetLocations() []Location {
+	if len(cachedLocations) > 0 && time.Now().Before(cacheExpiry) {
+		return cachedLocations
+	}
+
+	tryReload("")
+
+	body := "propertyNameEntered="
+	req := BuildRequestWithBody("GET", "/register-get-properties-from-name", nil, bytes.NewBufferString(body))
+	SetTypicalHeaders(req, nil, nil, true)
+
+	onRequest(req)
+	res, err := client.Do(req)
+	fmt.Println(DebugRequest(res.Request))
+	onResponse(res)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// print response body
+	response_body, err := io.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(DebugResponse(res))
+	fmt.Printf("%s\n", response_body)
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
+
+	locations := make([]Location, 0, 150)
+
+	// Find all input.property
+	doc.Find("input.property").Each(func(i int, s *goquery.Selection) {
+		log.Printf("%s", s.Text())
+	})
+
+	return locations
 }
