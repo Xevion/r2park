@@ -6,14 +6,6 @@ A Discord bot for easily registering parking at the Register2Park parking system
 - Register against the location using the make, model, and plate.
 - Another command can register your email and acquire an email confirmation.
 
-### Syntax
-
-```
-/register <make> <model> <plate>
-/location <location>
-/email <email>
-```
-
 ## Feature Ideas
 
 - Register commands in new guilds automatically
