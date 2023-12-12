@@ -20,3 +20,4 @@ A Discord bot for easily registering parking at the Register2Park parking system
 - Cache location data for fast autocomplete lookup
 - Sub-commands for registering using full details, saved data, or partial saved data.
 - Responses are not sent in the same channel, but instead as a hidden message.
+- No code stored with a location can be re-tried after registering a code later.
