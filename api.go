@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"regexp"
+	"slices"
 	"strconv"
 	"time"
 
@@ -62,12 +63,16 @@ func reload(name string) {
 	res, _ = client.Do(req)
 	onResponse(res)
 
-	// TODO: Verify that a PHPSESSID cookie is present
+	// Verify that a PHPSESSID cookie is present
+	site_cookies := client.Jar.Cookies(req.URL)
+	has_php_session := slices.ContainsFunc(site_cookies, func(cookie *http.Cookie) bool {
+		return cookie.Name == "PHPSESSID"
+	})
 
-	if len(name) > 0 {
-		// TODO: GET https://www.register2park.com/register-get-properties-from-name
-		// TODO: GET https://www.register2park.com/register?key=678zv9zzylvw
-		// TODO: GET https://www.register2park.com/register-get-properties-from-name
+	if !has_php_session {
+		log.Fatal("PHPSESSID cookie not found")
+	} else {
+		log.Println("PHPSESSID cookie found")
 	}
 }
 
