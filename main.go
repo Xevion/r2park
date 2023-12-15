@@ -22,7 +22,8 @@ var (
 
 func Bot() {
 	// Setup the session parameters
-	session, err := discordgo.New("Bot " + os.Getenv("BOT_TOKEN"))
+	var err error
+	session, err = discordgo.New("Bot " + os.Getenv("BOT_TOKEN"))
 	if err != nil {
 		log.Fatalf("Invalid bot parameters: %v", err)
 	}
