@@ -41,11 +41,11 @@ func Bot() {
 
 	// Login handler
 	session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Printf("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
+		log.Infof("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
 
-		// Count serers
+		// Count servers
 		guilds := s.State.Guilds
-		log.Printf("Connected to %d server%s", len(guilds), Plural(len(guilds)))
+		log.Debugf("Connected to %d server%s", len(guilds), Plural(len(guilds)))
 	})
 
 	// Open the session
@@ -70,7 +70,7 @@ func Bot() {
 	signal.Notify(stop, os.Interrupt)
 
 	// Register commands
-	log.Printf("Adding %d command%s...", len(commandDefinitions), Plural(len(commandDefinitions)))
+	log.Debugf("Adding %d command%s...", len(commandDefinitions), Plural(len(commandDefinitions)))
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commandDefinitions))
 	for definitionIndex, commandDefinition := range commandDefinitions {
 		command, err := session.ApplicationCommandCreate(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), commandDefinition)
@@ -90,7 +90,7 @@ func Bot() {
 	<-stop
 
 	// Remove commands
-	log.Infof("Removing %d command%s...\n", len(registeredCommands), Plural(len(registeredCommands)))
+	log.Debugf("Removing %d command%s...\n", len(registeredCommands), Plural(len(registeredCommands)))
 	for _, v := range registeredCommands {
 		log.Debugf("Removing '%v' command (%v)", v.Name, v.ID)
 		err := session.ApplicationCommandDelete(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), v.ID)
@@ -132,13 +132,11 @@ func main() {
 
 	switch command {
 	case "scan":
-		log.Info("Running scan")
+		log.Info("Scanning...")
 		Scan()
 	case "bot":
-		log.Info("Running bot")
-		Bot()
 	default:
-		log.Info("Running bot (default)")
+		log.Info("Starting bot...")
 		Bot()
 	}
 }

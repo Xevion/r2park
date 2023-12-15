@@ -16,7 +16,7 @@ import (
 var (
 	client             *http.Client
 	requestCounter     uint
-	lastReload         int64
+	lastReload         time.Time
 	parsePattern       = regexp.MustCompile(`\s*(.+)\n\s+(.+)\n\s+(\d+)\s*`)
 	cachedLocations    []Location
 	cachedLocationsMap map[uint]Location
@@ -24,7 +24,8 @@ var (
 )
 
 func init() {
-	cacheExpiry = time.Now().Add(-time.Second) // Set the cache as expired initially
+	lastReload = time.Now().Add(-time.Hour * 24 * 365) // Set the last reload time to a year ago
+	cacheExpiry = time.Now().Add(-time.Second)         // Set the cache as expired initially
 	cookies, err := cookiejar.New(nil)
 	if err != nil {
 		log.Fatal(err)
@@ -75,13 +76,13 @@ func reload() {
 // Attempts to reload the current session based on a given location's name.
 // This uses the current request counter and last reload time to determine if a reload is necessary.
 func tryReload() {
-	currentTime := time.Now().Unix()
-	lastReloadDiff := currentTime - lastReload
+	currentTime := time.Now()
+	lastReloadDiff := currentTime.Sub(lastReload)
 
 	if requestCounter >= 10 {
 		log.Info("Reloading session due to request count...")
 	} else if lastReloadDiff >= 15*60 {
-		log.Info("Reloading session due to time...")
+		log.Infof("Reloading session due to time (%s)...", lastReloadDiff)
 	} else {
 		return
 	}
