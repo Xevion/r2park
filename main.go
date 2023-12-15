@@ -53,6 +53,8 @@ func Bot() {
 	if err != nil {
 		log.Fatalf("Cannot open the session: %v", err)
 	}
+
+	// Make sure sessions and HTTP clients are closed
 	defer session.Close()
 	defer client.CloseIdleConnections() // HTTP client
 
@@ -72,6 +74,8 @@ func Bot() {
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commandDefinitions))
 	for definitionIndex, commandDefinition := range commandDefinitions {
 		command, err := session.ApplicationCommandCreate(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), commandDefinition)
+		log.Debugf("Registering '%v' command (%v)", commandDefinition.Name, command.ID)
+
 		if err != nil {
 			log.Panicf("Failed while registering '%v' command: %v", commandDefinition.Name, err)
 		}
@@ -79,7 +83,7 @@ func Bot() {
 	}
 
 	// Load the session
-	tryReload("")
+	tryReload()
 
 	// Wait here until CTRL-C or other term signal is received.
 	log.Println("Press Ctrl+C to exit")

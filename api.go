@@ -43,7 +43,7 @@ func onResponse(res *http.Response) {
 
 // Reloads the current session and completes the initial connection process that procedes bot operations.
 // This should be done regularly, such as after 10 requests or 15 minutes.
-func reload(name string) {
+func reload() {
 	// Ring the doorbell
 	req := BuildRequest("GET", "/", nil)
 	onRequest(req)
@@ -74,7 +74,7 @@ func reload(name string) {
 
 // Attempts to reload the current session based on a given location's name.
 // This uses the current request counter and last reload time to determine if a reload is necessary.
-func tryReload(name string) {
+func tryReload() {
 	currentTime := time.Now().Unix()
 	lastReloadDiff := currentTime - lastReload
 
@@ -86,7 +86,7 @@ func tryReload(name string) {
 		return
 	}
 
-	reload(name)
+	reload()
 	lastReload = currentTime
 	requestCounter = 0
 }
