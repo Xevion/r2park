@@ -1,13 +1,14 @@
 package main
 
 import (
-	"log"
+	"flag"
 	"os"
 	"os/signal"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -17,8 +18,18 @@ var (
 		"register": RegisterCommandHandler,
 		"code":     CodeCommandHandler,
 	}
-	db *redis.Client
+	db        *redis.Client
+	debugFlag = flag.Bool("debug", false, "Enable debug logging")
 )
+
+func init() {
+	flag.Parse()
+	if *debugFlag {
+		log.SetLevel(log.DebugLevel)
+	} else {
+		log.SetLevel(log.InfoLevel)
+	}
+}
 
 func Bot() {
 	// Setup the session parameters
@@ -75,18 +86,23 @@ func Bot() {
 	<-stop
 
 	// Remove commands
-	log.Printf("Removing %d command%s...\n", len(registeredCommands), Plural(len(registeredCommands)))
+	log.Infof("Removing %d command%s...\n", len(registeredCommands), Plural(len(registeredCommands)))
 	for _, v := range registeredCommands {
+		log.Debugf("Removing '%v' command (%v)", v.Name, v.ID)
 		err := session.ApplicationCommandDelete(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), v.ID)
 		if err != nil {
 			log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
 		}
 	}
 
-	log.Println("Gracefully shutting down.")
+	log.Warn("Gracefully shutting down.")
 }
 
 func main() {
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+	})
+
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
@@ -102,7 +118,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Redis connection established (%s).", ping_result)
+	log.Infof("Redis connection established (%s)", ping_result)
 
 	command := ""
 	if len(os.Args) > 1 {
@@ -111,13 +127,13 @@ func main() {
 
 	switch command {
 	case "scan":
-		log.Printf("Running scan")
+		log.Info("Running scan")
 		Scan()
 	case "bot":
-		log.Printf("Running bot")
+		log.Info("Running bot")
 		Bot()
 	default:
-		log.Printf("Running bot (default)")
+		log.Info("Running bot (default)")
 		Bot()
 	}
 }

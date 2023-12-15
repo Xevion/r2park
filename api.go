@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"regexp"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -33,16 +33,12 @@ func init() {
 }
 
 func onRequest(req *http.Request) {
-	log.Printf("GET %s", req.URL.String())
+	log.Debugf("GET %s", req.URL.String())
 	requestCounter++
 }
 
 func onResponse(res *http.Response) {
-	log.Printf("%s %d %s", res.Status, res.ContentLength, res.Header["Content-Type"])
-}
-
-func buildURL(path string, params map[string]string) string {
-	return baseURL + path
+	log.Debugf("%s %d %s", res.Status, res.ContentLength, res.Header["Content-Type"])
 }
 
 // Reloads the current session and completes the initial connection process that procedes bot operations.
@@ -72,7 +68,7 @@ func reload(name string) {
 	if !has_php_session {
 		log.Fatal("PHPSESSID cookie not found")
 	} else {
-		log.Println("PHPSESSID cookie found")
+		log.Debugf("PHPSESSID cookie found")
 	}
 }
 
@@ -83,9 +79,9 @@ func tryReload(name string) {
 	lastReloadDiff := currentTime - lastReload
 
 	if requestCounter >= 10 {
-		log.Println("Reloading session due to request count...")
+		log.Info("Reloading session due to request count...")
 	} else if lastReloadDiff >= 15*60 {
-		log.Println("Reloading session due to time...")
+		log.Info("Reloading session due to time...")
 	} else {
 		return
 	}

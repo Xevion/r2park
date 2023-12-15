@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func Scan() {
@@ -15,7 +16,7 @@ func Scan() {
 	total := len(locations)
 
 	for i, location := range locations {
-		log.Printf("[%6.2f] Fetching \"%s\" ", float64(i+1)/float64(total)*100, location.name)
+		log.Debugf("[%6.2f] Fetching \"%s\" ", float64(i+1)/float64(total)*100, location.name)
 
 		body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap", location.id)
 		req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
@@ -42,8 +43,6 @@ func Scan() {
 			if err != nil {
 				panic(err)
 			}
-
-			log.Println("DONE")
 		} else if stats.Size() < 16 {
 			// File exists, but is empty
 			file, err := os.OpenFile(html_path, os.O_WRONLY, 0644)
@@ -56,10 +55,8 @@ func Scan() {
 			if err != nil {
 				panic(err)
 			}
-			log.Println("OVERWRITE")
 		} else {
 			// File exists and is not empty, do nothing
-			log.Println("SKIP")
 		}
 	}
 }

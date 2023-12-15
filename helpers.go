@@ -3,13 +3,14 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"reflect"
 	"runtime/debug"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 const baseURL = "https://www.register2park.com"

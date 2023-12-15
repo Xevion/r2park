@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	log "github.com/sirupsen/logrus"
 )
 
 var CodeCommandDefinition = &discordgo.ApplicationCommand{
@@ -87,7 +87,7 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 				}
 			}
 		default:
-			log.Printf("Warning: Unhandled autocomplete option: %s", data.Options)
+			log.Printf("Warning: Unhandled autocomplete option: %v", data.Options)
 			return
 		}
 
