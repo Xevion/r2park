@@ -100,7 +100,7 @@ func GetLocations() []Location {
 		return cachedLocations
 	}
 
-	tryReload("")
+	tryReload()
 	log.Printf("Refetching locations (%s since refresh)", time.Now().Sub(cacheExpiry))
 
 	body := "propertyNameEntered=" // Empty, so we get all locations
