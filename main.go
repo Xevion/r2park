@@ -20,7 +20,7 @@ var (
 	db *redis.Client
 )
 
-func bot() {
+func Bot() {
 	// Setup the session parameters
 	session, err := discordgo.New("Bot " + os.Getenv("BOT_TOKEN"))
 	if err != nil {
@@ -114,9 +114,9 @@ func main() {
 		Scan()
 	case "bot":
 		log.Printf("Running bot")
-		bot()
+		Bot()
 	default:
 		log.Printf("Running bot (default)")
-		bot()
+		Bot()
 	}
 }
