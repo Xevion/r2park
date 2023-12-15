@@ -6,3 +6,8 @@ type Location struct {
 	name    string // Used for autocomplete & location selection
 	address string // Not used in this application so far
 }
+
+type Field struct {
+	text string // The text displayed
+	id   string // The id of the field
+}

@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -34,7 +37,7 @@ func init() {
 }
 
 func onRequest(req *http.Request) {
-	log.Debugf("GET %s", req.URL.String())
+	log.Debugf("%s %s", req.Method, req.URL.String())
 	requestCounter++
 }
 
@@ -146,4 +149,72 @@ func GetLocations() []Location {
 	cacheExpiry = time.Now().Add(time.Hour * 8) // Cache for 8 hours
 
 	return cachedLocations
+}
+
+type GetFormResult struct {
+	propertyName     string
+	address          string
+	fields           []Field  // label & inputs in the form
+	hiddenInputs     []string // hidden inputs in the form
+	requireGuestCode bool     // whether a guest code is required
+	err              error    // any error that occurred
+}
+
+func GetForm(id uint) GetFormResult {
+	body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap", id)
+	req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
+	SetTypicalHeaders(req, nil, nil, false)
+	onRequest(req)
+
+	res, _ := client.Do(req)
+	onResponse(res)
+
+	html, _ := io.ReadAll(res.Body)
+	htmlString := string(html)
+
+	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(htmlString))
+	if err != nil {
+		return GetFormResult{err: err}
+	}
+
+	// Check if this form is a VIP property
+	guestCodeInput := doc.Find("div.form-group > input#guestCode").First()
+	if guestCodeInput.Length() == 1 {
+		log.Debugf("Guest Code input: %v", guestCodeInput)
+		log.Debug("Guest Code form detected")
+		return GetFormResult{
+			requireGuestCode: true,
+		}
+	}
+
+	// Get the hidden inputs & form fields
+	hiddenInputs := make([]string, 0, 5)
+	formFields := make([]Field, 0, 5)
+	doc.Find("#property-name-form > input[type=hidden]").Each(func(i int, s *goquery.Selection) {
+		hiddenInputs = append(hiddenInputs, s.AttrOr("id", ""))
+	})
+	doc.Find("#property-name-form > div.form-group").Each(func(i int, s *goquery.Selection) {
+		input := s.Find("input.form-control").First()
+		label := s.Find("label").First().Text()
+
+		inputId, _ := input.Attr("id")
+
+		formFields = append(formFields, Field{
+			text: label,
+			id:   inputId,
+		})
+	})
+
+	// Acquire the title/address
+	titleElement := doc.Find("div > div > h4").First()
+	title := titleElement.Text()
+	address := strings.TrimSpace(titleElement.Next().Text())
+
+	return GetFormResult{
+		propertyName:     title,
+		address:          address,
+		fields:           formFields,
+		hiddenInputs:     hiddenInputs,
+		requireGuestCode: false,
+	}
 }
