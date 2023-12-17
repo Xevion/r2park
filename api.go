@@ -178,32 +178,14 @@ func GetForm(id uint) GetFormResult {
 	}
 
 	// Check if this form is a VIP property
-	guestCodeInput := doc.Find("div.form-group > input#guestCode").First()
-	if guestCodeInput.Length() == 1 {
-		log.Debugf("Guest Code input: %v", guestCodeInput)
-		log.Debug("Guest Code form detected")
+	if CheckGuestCodeRequired(doc) {
 		return GetFormResult{
 			requireGuestCode: true,
 		}
 	}
 
 	// Get the hidden inputs & form fields
-	hiddenInputs := make([]string, 0, 5)
-	formFields := make([]Field, 0, 5)
-	doc.Find("#property-name-form > input[type=hidden]").Each(func(i int, s *goquery.Selection) {
-		hiddenInputs = append(hiddenInputs, s.AttrOr("id", ""))
-	})
-	doc.Find("#property-name-form > div.form-group").Each(func(i int, s *goquery.Selection) {
-		input := s.Find("input.form-control").First()
-		label := s.Find("label").First().Text()
-
-		inputId, _ := input.Attr("id")
-
-		formFields = append(formFields, Field{
-			text: label,
-			id:   inputId,
-		})
-	})
+	formFields, hiddenInputs := GetFields(doc)
 
 	// Acquire the title/address
 	titleElement := doc.Find("div > div > h4").First()
@@ -211,10 +193,49 @@ func GetForm(id uint) GetFormResult {
 	address := strings.TrimSpace(titleElement.Next().Text())
 
 	return GetFormResult{
-		propertyName:     title,
-		address:          address,
-		fields:           formFields,
-		hiddenInputs:     hiddenInputs,
-		requireGuestCode: false,
+		propertyName: title,
+		address:      address,
+		fields:       formFields,
+		hiddenInputs: hiddenInputs,
+	}
+}
+
+func GetVipForm(id uint, guestCode string) GetFormResult {
+	body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap&guestCode=%s", id, guestCode)
+	req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
+	SetTypicalHeaders(req, nil, nil, false)
+	onRequest(req)
+
+	res, _ := client.Do(req)
+	onResponse(res)
+
+	html, _ := io.ReadAll(res.Body)
+	htmlString := string(html)
+
+	if htmlString == "guest-code" {
+		return GetFormResult{
+			requireGuestCode: true,
+			err:              fmt.Errorf("guest code is invalid"),
+		}
+	}
+
+	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(htmlString))
+	if err != nil {
+		return GetFormResult{err: err}
+	}
+
+	// Get the hidden inputs & form fields
+	formFields, hiddenInputs := GetFields(doc)
+
+	// Acquire the title/address
+	titleElement := doc.Find("div > div > h4").First()
+	title := titleElement.Text()
+	address := strings.TrimSpace(titleElement.Next().Text())
+
+	return GetFormResult{
+		propertyName: title,
+		address:      address,
+		fields:       formFields,
+		hiddenInputs: hiddenInputs,
 	}
 }
