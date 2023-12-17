@@ -63,8 +63,42 @@ func Bot() {
 
 	// Setup command handlers
 	session.AddHandler(func(internalSession *discordgo.Session, interaction *discordgo.InteractionCreate) {
-		if handler, ok := commandHandlers[interaction.ApplicationCommandData().Name]; ok {
-			handler(internalSession, interaction)
+		switch interaction.Type {
+		case discordgo.InteractionApplicationCommand, discordgo.InteractionApplicationCommandAutocomplete:
+			if handler, ok := commandHandlers[interaction.ApplicationCommandData().Name]; ok {
+				handler(internalSession, interaction)
+			}
+
+		case discordgo.InteractionModalSubmit:
+			err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "Registration data received. Please wait while your vehicle is registered.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			if err != nil {
+				panic(err)
+			}
+			data := interaction.ModalSubmitData()
+			log.Debugf("Submitted: %v", data)
+
+			// if !strings.HasPrefix(data.CustomID, "modals_survey") {
+			// 	return
+			// }
+
+			// userid := strings.Split(data.CustomID, "_")[2]
+			// _, err = s.ChannelMessageSend(*ResultsChannel, fmt.Sprintf(
+			// 	"Feedback received. From <@%s>\n\n**Opinion**:\n%s\n\n**Suggestions**:\n%s",
+			// 	userid,
+			// 	data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value,
+			// 	data.Components[1].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value,
+			// ))
+			// if err != nil {
+			// 	panic(err)
+			// }
+		default:
+			log.Warnf("Warning: Unhandled interaction type: %v", interaction.Type)
 		}
 	})
 
