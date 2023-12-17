@@ -6,6 +6,7 @@ import (
 	"os/signal"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
@@ -81,7 +82,7 @@ func Bot() {
 				panic(err)
 			}
 			data := interaction.ModalSubmitData()
-			log.Debugf("Submitted: %v", data)
+			spew.Dump(data)
 
 			// if !strings.HasPrefix(data.CustomID, "modals_survey") {
 			// 	return
