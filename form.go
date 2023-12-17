@@ -1,6 +1,9 @@
 package main
 
-import "github.com/bwmarrin/discordgo"
+import (
+	"github.com/bwmarrin/discordgo"
+	log "github.com/sirupsen/logrus"
+)
 
 // FormToComponents converts the form requested into usable modal components.
 func FormToComponents(form GetFormResult) []discordgo.MessageComponent {
@@ -49,13 +52,16 @@ func FormToComponents(form GetFormResult) []discordgo.MessageComponent {
 				MinLength:   1,
 				MaxLength:   9,
 			}
-
-			components = append(components, discordgo.ActionsRow{
-				Components: []discordgo.MessageComponent{
-					component,
-				},
-			})
+		default:
+			log.Warnf("unexpected field handled for \"%s\" (%v, %s)", form.propertyName, field.id, field.text)
 		}
+
+		// Each field is contained within its own row.
+		components = append(components, discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				component,
+			},
+		})
 	}
 
 	return components
