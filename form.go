@@ -54,6 +54,14 @@ func FormToComponents(form GetFormResult) []discordgo.MessageComponent {
 			}
 		default:
 			log.Warnf("unexpected field handled for \"%s\" (%v, %s)", form.propertyName, field.id, field.text)
+			component = discordgo.TextInput{
+				CustomID:  field.id,
+				Label:     field.text,
+				Style:     discordgo.TextInputShort,
+				Required:  true,
+				MinLength: 1,
+				MaxLength: 100,
+			}
 		}
 
 		// Each field is contained within its own row.
