@@ -46,6 +46,9 @@ func Bot() {
 		// Count servers
 		guilds := s.State.Guilds
 		log.Debugf("Connected to %d server%s", len(guilds), Plural(len(guilds)))
+
+		// Load the session
+		tryReload()
 	})
 
 	// Open the session
@@ -81,9 +84,6 @@ func Bot() {
 		}
 		registeredCommands[definitionIndex] = command
 	}
-
-	// Load the session
-	tryReload()
 
 	// Wait here until CTRL-C or other term signal is received.
 	log.Println("Press Ctrl+C to exit")
