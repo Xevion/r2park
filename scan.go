@@ -21,10 +21,8 @@ func Scan() {
 		body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap", location.id)
 		req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
 		SetTypicalHeaders(req, nil, nil, false)
-		onRequest(req)
+		res, _ := doRequest(req)
 
-		res, _ := client.Do(req)
-		onResponse(res)
 		html, _ := io.ReadAll(res.Body)
 
 		html_path := filepath.Join("./forms", fmt.Sprintf("%d.html", location.id))

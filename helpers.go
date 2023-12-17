@@ -80,6 +80,14 @@ func SetTypicalHeaders(req *http.Request, contentType *string, referrer *string,
 	}
 }
 
+// doRequest performs the given request and calls onRequest and onResponse.
+func doRequest(request *http.Request) (*http.Response, error) {
+	onRequest(request)
+	response, error := client.Do(request)
+	onResponse(response)
+	return response, error
+}
+
 // GetRandomItems returns N random items from the given array.
 // The seed_value is used to control the output.
 // If the array is not a slice, an error is returned.

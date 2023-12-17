@@ -50,18 +50,14 @@ func onResponse(res *http.Response) {
 func reload() {
 	// Ring the doorbell
 	req := BuildRequest("GET", "/", nil)
-	onRequest(req)
-	res, _ := client.Do(req)
-	onResponse(res)
+	doRequest(req)
 
 	// Ring the second doorbell (seems to be a way of validating whether a client is a 'browser' or not)
 	req = BuildRequest("GET", "/index.php", map[string]string{
 		"width":  "1920",
 		"height": "1080",
 	})
-	onRequest(req)
-	res, _ = client.Do(req)
-	onResponse(res)
+	doRequest(req)
 
 	// Verify that a PHPSESSID cookie is present
 	site_cookies := client.Jar.Cookies(req.URL)
@@ -111,9 +107,7 @@ func GetLocations() []Location {
 	req := BuildRequestWithBody("POST", "/register-get-properties-from-name", nil, bytes.NewBufferString(body))
 	SetTypicalHeaders(req, nil, nil, true)
 
-	onRequest(req)
-	res, err := client.Do(req)
-	onResponse(res)
+	res, err := doRequest(req)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -164,10 +158,8 @@ func GetForm(id uint) GetFormResult {
 	body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap", id)
 	req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
 	SetTypicalHeaders(req, nil, nil, false)
-	onRequest(req)
 
-	res, _ := client.Do(req)
-	onResponse(res)
+	res, _ := doRequest(req)
 
 	html, _ := io.ReadAll(res.Body)
 	htmlString := string(html)
@@ -204,10 +196,8 @@ func GetVipForm(id uint, guestCode string) GetFormResult {
 	body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap&guestCode=%s", id, guestCode)
 	req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
 	SetTypicalHeaders(req, nil, nil, false)
-	onRequest(req)
 
-	res, _ := client.Do(req)
-	onResponse(res)
+	res, _ := doRequest(req)
 
 	html, _ := io.ReadAll(res.Body)
 	htmlString := string(html)
