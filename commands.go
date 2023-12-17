@@ -116,26 +116,9 @@ var RegisterCommandDefinition = &discordgo.ApplicationCommand{
 		},
 		{
 			Type:        discordgo.ApplicationCommandOptionString,
-			Name:        "make",
-			Description: "Make of Vehicle (e.g. Honda)",
-			MaxLength:   15,
-			Required:    true,
-			// TODO: Add autocomplete
-		},
-		{
-			Type:        discordgo.ApplicationCommandOptionString,
-			Name:        "model",
-			Description: "Model of Vehicle (e.g. Civic)",
-			MaxLength:   15,
-			Required:    true,
-			// TODO: Add autocomplete
-		},
-		{
-			Type:        discordgo.ApplicationCommandOptionString,
-			Name:        "plate",
-			Description: "License Plate Number (e.g. 123ABC)",
-			MaxLength:   8,
-			Required:    true,
+			Name:        "code",
+			Description: "The guest code, if required",
+			Required:    false,
 		},
 	},
 }
@@ -144,30 +127,69 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 	switch interaction.Type {
 
 	case discordgo.InteractionApplicationCommand:
-		// TODO: Validate license plate
-		session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Embeds: []*discordgo.MessageEmbed{
-					{
-						Footer: &discordgo.MessageEmbedFooter{
-							Text: GetFooterText(),
+		location_id, parse_err := strconv.Atoi(interaction.ApplicationCommandData().Options[0].StringValue())
+		if parse_err != nil {
+			panic(parse_err)
+		}
+
+		form := GetForm(uint(location_id))
+		if form.err != nil {
+			panic(form.err)
+		}
+
+		if form.requireGuestCode {
+			session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Embeds: []*discordgo.MessageEmbed{
+						{
+							Footer: &discordgo.MessageEmbedFooter{
+								Text: GetFooterText(),
+							},
+							Description: "This location requires a guest code to register a vehicle.",
 						},
-						Description: "testing 123",
-						Fields:      []*discordgo.MessageEmbedField{},
 					},
 				},
-				AllowedMentions: &discordgo.MessageAllowedMentions{},
+			})
+			return
+		}
+
+		registrationFormComponents := FormToComponents(form)
+
+		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				CustomID:   "registration_" + interaction.Interaction.Member.User.ID,
+				Title:      "Vehicle Registration",
+				Components: registrationFormComponents,
 			},
 		})
+		if err != nil {
+			panic(err)
+		}
+
+		// TODO: Validate license plate
+		// session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+		// 	Type: discordgo.InteractionResponseChannelMessageWithSource,
+		// 	Data: &discordgo.InteractionResponseData{
+		// 		Embeds: []*discordgo.MessageEmbed{
+		// 			{
+		// 				Footer: &discordgo.MessageEmbedFooter{
+		// 					Text: GetFooterText(),
+		// 				},
+		// 				Description: "testing 123",
+		// 				Fields:      []*discordgo.MessageEmbedField{},
+		// 			},
+		// 		},
+		// 		AllowedMentions: &discordgo.MessageAllowedMentions{},
+		// 	},
+		// })
 
 	case discordgo.InteractionApplicationCommandAutocomplete:
 		data := interaction.ApplicationCommandData()
 		var choices []*discordgo.ApplicationCommandOptionChoice
 
 		LocationOption := data.Options[0]
-		MakeOption := data.Options[1]
-		ModelOption := data.Options[2]
 
 		switch {
 		case LocationOption.Focused:
@@ -184,9 +206,6 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 					Value: strconv.Itoa(int(location.id)),
 				}
 			}
-		case MakeOption.Focused:
-
-		case ModelOption.Focused:
 		}
 
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
