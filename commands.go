@@ -127,31 +127,62 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 	switch interaction.Type {
 
 	case discordgo.InteractionApplicationCommand:
-		location_id, parse_err := strconv.Atoi(interaction.ApplicationCommandData().Options[0].StringValue())
+		data := interaction.ApplicationCommandData()
+
+		location_id, parse_err := strconv.Atoi(data.Options[0].StringValue())
 		if parse_err != nil {
-			panic(parse_err)
-		}
-
-		form := GetForm(uint(location_id))
-		if form.err != nil {
-			panic(form.err)
-		}
-
-		if form.requireGuestCode {
-			session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Embeds: []*discordgo.MessageEmbed{
-						{
-							Footer: &discordgo.MessageEmbedFooter{
-								Text: GetFooterText(),
-							},
-							Description: "This location requires a guest code to register a vehicle.",
-						},
-					},
-				},
-			})
+			HandleError(session, interaction, parse_err, "Error occurred while parsing location id")
 			return
+		}
+
+		var form GetFormResult
+		var code string
+		var useStoredCode bool
+
+		guestCodeProvided := len(data.Options) > 1
+		if guestCodeProvided {
+			code = data.Options[1].StringValue()
+		}
+		userId, _ := strconv.Atoi(interaction.Member.User.ID)
+		guestCodeCondition := GetCodeRequired(int64(location_id))
+
+		// Certain error condition
+		if !guestCodeProvided && guestCodeCondition == GuestCodeNotRequired {
+			log.Debugf("No guest code provided for location %d, but one is required. Checking for stored code.", location_id)
+			code = GetCode(int64(location_id), int(userId))
+
+			if code == "" {
+				HandleError(session, interaction, nil, ":x: This location requires a guest code.")
+				return
+			} else {
+				log.Debugf("Using stored code for location %d: %s", location_id, code)
+				guestCodeProvided = true
+				useStoredCode = true
+			}
+		}
+
+		if guestCodeProvided {
+			form = GetVipForm(uint(location_id), code)
+			if form.requireGuestCode {
+				if useStoredCode {
+					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one stored was not valid & deleted.")
+					RemoveCode(int64(location_id), int(userId))
+				} else {
+					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one provided was not valid.")
+				}
+				return
+			}
+		} else {
+			form = GetForm(uint(location_id))
+			if form.requireGuestCode {
+				// Apparently the code was required, so we mark it as such.
+				if guestCodeCondition == Unknown {
+					log.Debugf("Marking location %d as requiring a guest code", location_id)
+					SetCodeRequired(int64(location_id), true)
+				}
+				HandleError(session, interaction, nil, ":x: This location requires a guest code.")
+				return
+			}
 		}
 
 		registrationFormComponents := FormToComponents(form)
@@ -159,7 +190,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
-				CustomID:   "registration_" + interaction.Interaction.Member.User.ID,
+				CustomID:   "register:" + interaction.Interaction.Member.User.ID,
 				Title:      "Vehicle Registration",
 				Components: registrationFormComponents,
 			},
