@@ -4,9 +4,9 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-redis/redis"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +18,9 @@ var (
 	commandHandlers    = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"register": RegisterCommandHandler,
 		"code":     CodeCommandHandler,
+	}
+	modalHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
+		"register": RegisterModalHandler,
 	}
 	db        *redis.Client
 	debugFlag = flag.Bool("debug", false, "Enable debug logging")
@@ -71,18 +74,12 @@ func Bot() {
 			}
 
 		case discordgo.InteractionModalSubmit:
-			err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "Registration data received. Please wait while your vehicle is registered.",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			if err != nil {
-				panic(err)
+			id := interaction.ModalSubmitData().CustomID
+			handlerId := id[:strings.Index(id, ":")]
+
+			if handler, ok := modalHandlers[handlerId]; ok {
+				handler(internalSession, interaction)
 			}
-			data := interaction.ModalSubmitData()
-			spew.Dump(data)
 
 			// if !strings.HasPrefix(data.CustomID, "modals_survey") {
 			// 	return
