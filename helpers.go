@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -167,4 +168,29 @@ func GetFooterText() string {
 	return fmt.Sprintf("%s (#%s)",
 		time.Now().Format("Jan 2, 2006 3:04:05PM"),
 		strings.ToLower(CommitId[:7]))
+}
+
+// HandleError(session, interaction, parse_err)
+func HandleError(session *discordgo.Session, interaction *discordgo.InteractionCreate, err error, message string) {
+	if err != nil {
+		log.Errorf("%s (%v)", message, err)
+	}
+
+	err = session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{
+				{
+					Footer: &discordgo.MessageEmbedFooter{
+						Text: GetFooterText(),
+					},
+					Description: message,
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		log.Warn("Unable to provide error response to user.", err)
+	}
 }
