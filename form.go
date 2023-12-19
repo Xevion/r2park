@@ -52,6 +52,8 @@ func FormToComponents(form GetFormResult) []discordgo.MessageComponent {
 				MinLength:   1,
 				MaxLength:   9,
 			}
+		case "vehicleLicensePlateConfirm":
+			log.Debug("Ignored field \"vehicleLicensePlateConfirm\"")
 		default:
 			log.Warnf("unexpected field handled for \"%s\" (%v, %s)", form.propertyName, field.id, field.text)
 			component = discordgo.TextInput{
