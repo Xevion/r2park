@@ -194,7 +194,7 @@ func GetForm(id uint) GetFormResult {
 
 func GetVipForm(id uint, guestCode string) GetFormResult {
 	body := fmt.Sprintf("propertyIdSelected=%d&propertySource=parking-snap&guestCode=%s", id, guestCode)
-	req := BuildRequestWithBody("POST", "/register-get-vehicle-form", nil, bytes.NewBufferString(body))
+	req := BuildRequestWithBody("POST", "/register-get-vip-vehicle-form", nil, bytes.NewBufferString(body))
 	SetTypicalHeaders(req, nil, nil, false)
 
 	res, _ := doRequest(req)
