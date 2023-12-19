@@ -11,3 +11,9 @@ type Field struct {
 	text string // The text displayed
 	id   string // The id of the field
 }
+
+const (
+	GuestCodeRequired    = iota
+	GuestCodeNotRequired = iota
+	Unknown              = iota
+)
