@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/zekroTJA/timedmap"
 )
 
@@ -33,6 +33,13 @@ var CodeCommandDefinition = &discordgo.ApplicationCommand{
 }
 
 func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	log := logrus.WithFields(logrus.Fields{
+		"interaction": interaction.ID,
+		"message":     interaction.Message.Reference(),
+		"user":        interaction.Member.User.ID,
+		"command":     "code",
+	})
+
 	switch interaction.Type {
 
 	case discordgo.InteractionApplicationCommand:
@@ -97,7 +104,7 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 					break
 				}
 			}
-			log.WithFields(log.Fields{"focusedIndex": focusedIndex}).Warn("Unhandled autocomplete option")
+			log.WithFields(logrus.Fields{"focusedIndex": focusedIndex}).Warn("Unhandled autocomplete option")
 			return
 		}
 
@@ -134,6 +141,13 @@ var RegisterCommandDefinition = &discordgo.ApplicationCommand{
 }
 
 func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	log := logrus.WithFields(logrus.Fields{
+		"interaction": interaction.ID,
+		"message":     interaction.Message.Reference(),
+		"user":        interaction.Member.User.ID,
+		"command":     "code",
+	})
+
 	switch interaction.Type {
 
 	case discordgo.InteractionApplicationCommand:
@@ -176,7 +190,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 				return
 			} else {
 				// Code available, use it.
-				log.WithFields(log.Fields{
+				log.WithFields(logrus.Fields{
 					"location_id": location_id,
 					"code":        code,
 				}).Debug("Using stored code for location")
@@ -205,7 +219,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			if form.requireGuestCode {
 				// The code ended up being required, so we mark it as such.
 				if guestCodeCondition == Unknown {
-					log.WithFields(log.Fields{
+					log.WithFields(logrus.Fields{
 						"location_id": location_id,
 					}).Debug("Marking location as requiring a guest code")
 					SetCodeRequirement(int64(location_id), true)
