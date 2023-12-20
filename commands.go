@@ -35,7 +35,6 @@ var CodeCommandDefinition = &discordgo.ApplicationCommand{
 func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
 	log := logrus.WithFields(logrus.Fields{
 		"interaction": interaction.ID,
-		"message":     interaction.Message.Reference(),
 		"user":        interaction.Member.User.ID,
 		"command":     "code",
 	})
@@ -143,7 +142,6 @@ var RegisterCommandDefinition = &discordgo.ApplicationCommand{
 func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
 	log := logrus.WithFields(logrus.Fields{
 		"interaction": interaction.ID,
-		"message":     interaction.Message.Reference(),
 		"user":        interaction.Member.User.ID,
 		"command":     "code",
 	})
@@ -181,7 +179,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		// Circumstane under which error is certain
 		if !guestCodeProvided && guestCodeCondition == GuestCodeNotRequired {
 			// A guest code could be stored, so check for it.
-			log.Debugf("No guest code provided for location %d, but one is required. Checking for stored code.", location_id)
+			log.WithField("location", location_id).Debug("No guest code provided for location, but one is not required. Checking for stored code.")
 			code = GetCode(int64(location_id), int(userId))
 
 			if code == "" {
