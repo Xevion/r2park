@@ -6,6 +6,9 @@ import (
 )
 
 func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
+	// TODO: Pull in all parameters from the form
+	// TOOD: Pull in all hidden parameters form database
+	// TODO: Pull in resident ID from database
 	err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -18,4 +21,8 @@ func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.Int
 	}
 	data := interaction.ModalSubmitData()
 	spew.Dump(data)
+
+	// TOOD: Submit registration request to API
+	// TODO: Edit response to indicate success/failure
+	// TOOD: On success, provide a button to submit email confirmation
 }
