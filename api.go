@@ -38,12 +38,19 @@ func init() {
 }
 
 func onRequest(req *http.Request) {
-	log.Debugf("%s %s", req.Method, req.URL.String())
+	log.WithFields(log.Fields{
+		"method": req.Method,
+		"url":    req.URL.String(),
+	}).Debugf("%s %s", req.Method, req.URL.String())
 	requestCounter++
 }
 
 func onResponse(res *http.Response) {
-	log.Debugf("%s %d %s", res.Status, res.ContentLength, res.Header["Content-Type"])
+	log.WithFields(log.Fields{
+		"status": res.Status,
+		"length": res.ContentLength,
+		"type":   res.Header["Content-Type"],
+	}).Debugf("%s %d %s", res.Status, res.ContentLength, res.Header["Content-Type"])
 }
 
 // Reloads the current session and completes the initial connection process that procedes bot operations.
@@ -67,7 +74,7 @@ func reload() {
 	})
 
 	if !has_php_session {
-		log.Fatal("PHPSESSID cookie not found")
+		log.WithFields(log.Fields{"cookies": site_cookies}).Panic("PHPSESSID cookie not found")
 	} else {
 		log.Debugf("PHPSESSID cookie found")
 	}
@@ -80,9 +87,10 @@ func tryReload() {
 	lastReloadDiff := currentTime.Sub(lastReload)
 
 	if requestCounter >= 10 {
-		log.Info("Reloading session due to request count...")
+		log.WithFields(log.Fields{"requestCounter": requestCounter}).Info("Reloading session due to request count")
+		log.Info("Reloading session due to request count")
 	} else if lastReloadDiff >= 15*60 {
-		log.Infof("Reloading session due to time (%s)...", lastReloadDiff)
+		log.WithFields(log.Fields{"lastReload": lastReload, "difference": lastReloadDiff}).Info("Reloading session due to time")
 	} else {
 		return
 	}
@@ -92,17 +100,13 @@ func tryReload() {
 	requestCounter = 0
 }
 
-func register(location uint, code string, make string, model string, plate string) {
-
-}
-
 func GetLocations() []Location {
 	if time.Now().Before(cacheExpiry) {
 		return cachedLocations
 	}
 
 	tryReload()
-	log.Printf("Refetching locations (%s since refresh)", time.Now().Sub(cacheExpiry))
+	log.WithFields(log.Fields{"sinceRefresh": time.Now().Sub(cacheExpiry)}).Debug("Refetching locations")
 
 	body := "propertyNameEntered=" // Empty, so we get all locations
 	req := BuildRequestWithBody("POST", "/register-get-properties-from-name", nil, bytes.NewBufferString(body))
@@ -147,13 +151,13 @@ func GetLocations() []Location {
 }
 
 type GetFormResult struct {
-	propertyName     string
-	address          string
-	fields           []Field  // label & inputs in the form
-	hiddenInputs     []string // hidden inputs in the form
-	requireGuestCode bool     // whether a guest code is required
+	propertyName      string
+	address           string
+	fields            []Field  // label & inputs in the form
+	hiddenInputs      []string // hidden inputs in the form
+	requireGuestCode  bool     // whether a guest code is required
 	residentProfileId string
-	err              error    // any error that occurred
+	err               error // any error that occurred
 }
 
 func GetForm(id uint) GetFormResult {
@@ -178,7 +182,7 @@ func GetForm(id uint) GetFormResult {
 		}
 	}
 
-	// Get the resident profile 
+	// Get the resident profile
 	nextButton := doc.Find("#vehicleInformationVIP").First()
 	residentProfileId, _ := nextButton.Attr("data-resident-profile-id")
 
@@ -191,10 +195,10 @@ func GetForm(id uint) GetFormResult {
 	address := strings.TrimSpace(titleElement.Next().Text())
 
 	return GetFormResult{
-		propertyName: title,
-		address:      address,
-		fields:       formFields,
-		hiddenInputs: hiddenInputs,
+		propertyName:      title,
+		address:           address,
+		fields:            formFields,
+		hiddenInputs:      hiddenInputs,
 		residentProfileId: residentProfileId,
 	}
 }
@@ -243,7 +247,7 @@ type RegistrationResult struct {
 	emailIdentifier  string
 }
 
-func RegisterVehicle(formParams map[string]string, propertyId uint, residentProfileId uint, hiddenParams []string) (bool, RegistrationResult) {
+func RegisterVehicle(formParams map[string]string, propertyId uint, residentProfileId uint, hiddenParams []string) (bool, *RegistrationResult) {
 	body := url.Values{}
 	body.Set("propertySource", "parking-snap")
 	body.Set("propertyIdSelected", strconv.FormatUint(uint64(propertyId), 10))
@@ -270,5 +274,5 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 	// TODO: Parsing of success/failure
 	log.Debugf("RegisterVehicle response: %s", htmlString)
 
-	return (false, nil)
+	return false, nil
 }

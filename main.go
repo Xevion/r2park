@@ -40,16 +40,19 @@ func Bot() {
 	var err error
 	session, err = discordgo.New("Bot " + os.Getenv("BOT_TOKEN"))
 	if err != nil {
-		log.Fatalf("Invalid bot parameters: %v", err)
+		log.WithField("error", err).Panic("Invalid bot parameters")
 	}
 
 	// Login handler
 	session.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Infof("Logged in as: %v#%v", s.State.User.Username, s.State.User.Discriminator)
-
-		// Count servers
-		guilds := s.State.Guilds
-		log.Debugf("Connected to %d server%s", len(guilds), Plural(len(guilds)))
+		log.WithFields(
+			log.Fields{
+				"username":      r.User.Username,
+				"discriminator": r.User.Discriminator,
+				"id":            r.User.ID,
+				"guilds":        len(r.Guilds),
+				"session":       r.SessionID,
+			}).Info("Logged in successfully")
 
 		// Load the session
 		tryReload()
@@ -58,7 +61,7 @@ func Bot() {
 	// Open the session
 	err = session.Open()
 	if err != nil {
-		log.Fatalf("Cannot open the session: %v", err)
+		log.WithField("error", err).Panic("Cannot open the session")
 	}
 
 	// Make sure sessions and HTTP clients are closed
@@ -96,7 +99,11 @@ func Bot() {
 			// 	panic(err)
 			// }
 		default:
-			log.Warnf("Warning: Unhandled interaction type: %v", interaction.Type)
+			log.WithFields(
+				log.Fields{
+					"type": interaction.Type,
+					"ref":  interaction.Message.Reference(),
+				}).Warn("Unhandled interaction type")
 		}
 	})
 
@@ -105,33 +112,40 @@ func Bot() {
 	signal.Notify(stop, os.Interrupt)
 
 	// Register commands
-	log.Debugf("Adding %d command%s...", len(commandDefinitions), Plural(len(commandDefinitions)))
+	log.WithField("count", len(commandDefinitions)).Info("Registering commands")
 	registeredCommands := make([]*discordgo.ApplicationCommand, len(commandDefinitions))
 	for definitionIndex, commandDefinition := range commandDefinitions {
 		command, err := session.ApplicationCommandCreate(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), commandDefinition)
-		log.Debugf("Registering '%v' command (%v)", commandDefinition.Name, command.ID)
+		log.WithField("command", commandDefinition.Name).Debug("Registering command")
 
 		if err != nil {
-			log.Panicf("Failed while registering '%v' command: %v", commandDefinition.Name, err)
+			log.WithFields(log.Fields{
+				"error":   err,
+				"command": commandDefinition.Name,
+			}).Panic("Failed while registering command")
 		}
 		registeredCommands[definitionIndex] = command
 	}
 
 	// Wait here until CTRL-C or other term signal is received.
-	log.Println("Press Ctrl+C to exit")
+	log.Info("Press Ctrl+C to exit")
 	<-stop
 
 	// Remove commands
-	log.Debugf("Removing %d command%s...\n", len(registeredCommands), Plural(len(registeredCommands)))
-	for _, v := range registeredCommands {
-		log.Debugf("Removing '%v' command (%v)", v.Name, v.ID)
-		err := session.ApplicationCommandDelete(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), v.ID)
+	log.WithField("count", len(registeredCommands)).Info("Removing commands")
+	for _, registeredCommand := range registeredCommands {
+		log.WithFields(log.Fields{
+			"command": registeredCommand.Name,
+			"id":      registeredCommand.ID,
+		}).Debug("Removing command")
+		err := session.ApplicationCommandDelete(session.State.User.ID, os.Getenv("BOT_TARGET_GUILD"), registeredCommand.ID)
 		if err != nil {
-			log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
+			log.Panicf("Cannot delete '%v' command: %v", registeredCommand.Name, err)
 		}
 	}
 
-	log.Warn("Gracefully shutting down.")
+	log.Warn("Gracefully shutting down")
+	defer log.Warn("Graceful shutdown complete")
 }
 
 func main() {
@@ -142,7 +156,7 @@ func main() {
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.WithField("error", err).Panic("Error loading .env file")
 	}
 
 	opt := &redis.Options{
@@ -155,7 +169,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("Redis connection established (%s)", ping_result)
+	log.WithField("ping", ping_result).Info("Redis connection established")
 
 	command := ""
 	args := flag.Args()
@@ -163,6 +177,7 @@ func main() {
 		command = args[1]
 	}
 
+	log.WithField("command", command).Debug("Starting up")
 	switch command {
 	case "scan":
 		log.Info("Scanning...")
