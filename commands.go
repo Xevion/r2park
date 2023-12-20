@@ -7,7 +7,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	log "github.com/sirupsen/logrus"
+	"github.com/zekroTJA/timedmap"
 )
+
+var SubmissionContexts = timedmap.New(5 * time.Minute)
 
 var CodeCommandDefinition = &discordgo.ApplicationCommand{
 	Name:        "code",
@@ -87,7 +90,14 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 				}
 			}
 		default:
-			log.Printf("Warning: Unhandled autocomplete option: %v", data.Options)
+			focusedIndex := 0
+			for i, option := range data.Options {
+				if option.Focused {
+					focusedIndex = i
+					break
+				}
+			}
+			log.WithFields(log.Fields{"focusedIndex": focusedIndex}).Warn("Unhandled autocomplete option")
 			return
 		}
 
@@ -143,19 +153,33 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		if guestCodeProvided {
 			code = data.Options[1].StringValue()
 		}
-		userId, _ := strconv.Atoi(interaction.Member.User.ID)
-		guestCodeCondition := GetCodeRequired(int64(location_id))
+		userId, parseErr := strconv.Atoi(interaction.Member.User.ID)
+		if parseErr != nil {
+			HandleError(session, interaction, parseErr, "Error occurred while parsing user id")
+			return
+		}
 
-		// Certain error condition
+		// Check if a guest code is required for this location
+		guestCodeCondition := GetCodeRequirement(int64(location_id))
+
+		// TODO: Add case for when guest code is provided but not required
+
+		// Circumstane under which error is certain
 		if !guestCodeProvided && guestCodeCondition == GuestCodeNotRequired {
+			// A guest code could be stored, so check for it.
 			log.Debugf("No guest code provided for location %d, but one is required. Checking for stored code.", location_id)
 			code = GetCode(int64(location_id), int(userId))
 
 			if code == "" {
+				// No code was stored, error out.
 				HandleError(session, interaction, nil, ":x: This location requires a guest code.")
 				return
 			} else {
-				log.Debugf("Using stored code for location %d: %s", location_id, code)
+				// Code available, use it.
+				log.WithFields(log.Fields{
+					"location_id": location_id,
+					"code":        code,
+				}).Debug("Using stored code for location")
 				guestCodeProvided = true
 				useStoredCode = true
 			}
@@ -163,7 +187,10 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 
 		if guestCodeProvided {
 			form = GetVipForm(uint(location_id), code)
+
+			// requireGuestCode being returned for a VIP form indicates an invalid code.
 			if form.requireGuestCode {
+				// Handling is the same for both cases, but the message differs & the code is removed if it was stored.
 				if useStoredCode {
 					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one stored was not valid & deleted.")
 					RemoveCode(int64(location_id), int(userId))
@@ -174,23 +201,46 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			}
 		} else {
 			form = GetForm(uint(location_id))
+
 			if form.requireGuestCode {
-				// Apparently the code was required, so we mark it as such.
+				// The code ended up being required, so we mark it as such.
 				if guestCodeCondition == Unknown {
-					log.Debugf("Marking location %d as requiring a guest code", location_id)
-					SetCodeRequired(int64(location_id), true)
+					log.WithFields(log.Fields{
+						"location_id": location_id,
+					}).Debug("Marking location as requiring a guest code")
+					SetCodeRequirement(int64(location_id), true)
 				}
 				HandleError(session, interaction, nil, ":x: This location requires a guest code.")
 				return
 			}
 		}
 
+		// Convert the form into message components for a modal presented to the user
 		registrationFormComponents := FormToComponents(form)
+
+		// The message ID of the original interaction is used as the identifier for the registration context (uin664)
+		registerIdentifier, parseErr := strconv.ParseUint(interaction.Message.ID, 10, 64)
+		if parseErr != nil {
+			HandleError(session, interaction, parseErr, "Error occurred while parsing interaction message identifier")
+		}
+
+		requiredFormKeys := make([]string, len(form.fields))
+		for i, field := range form.fields {
+			requiredFormKeys[i] = field.id
+		}
+
+		// Store the registration context for later use
+		SubmissionContexts.Set(registerIdentifier, &RegisterContext{
+			hiddenKeys:       form.hiddenInputs,
+			propertyId:       uint(location_id),
+			requiredFormKeys: requiredFormKeys,
+			residentId:       0,
+		}, time.Hour)
 
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
-				CustomID:   "register:" + interaction.Interaction.Member.User.ID,
+				CustomID:   "register:" + interaction.Message.ID,
 				Title:      "Vehicle Registration",
 				Components: registrationFormComponents,
 			},
