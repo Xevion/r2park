@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -151,6 +152,7 @@ type GetFormResult struct {
 	fields           []Field  // label & inputs in the form
 	hiddenInputs     []string // hidden inputs in the form
 	requireGuestCode bool     // whether a guest code is required
+	residentProfileId string
 	err              error    // any error that occurred
 }
 
@@ -161,9 +163,9 @@ func GetForm(id uint) GetFormResult {
 
 	res, _ := doRequest(req)
 
+	// Read and parse the HTML response body
 	html, _ := io.ReadAll(res.Body)
 	htmlString := string(html)
-
 	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(htmlString))
 	if err != nil {
 		return GetFormResult{err: err}
@@ -175,6 +177,10 @@ func GetForm(id uint) GetFormResult {
 			requireGuestCode: true,
 		}
 	}
+
+	// Get the resident profile 
+	nextButton := doc.Find("#vehicleInformationVIP").First()
+	residentProfileId, _ := nextButton.Attr("data-resident-profile-id")
 
 	// Get the hidden inputs & form fields
 	formFields, hiddenInputs := GetFields(doc)
@@ -189,6 +195,7 @@ func GetForm(id uint) GetFormResult {
 		address:      address,
 		fields:       formFields,
 		hiddenInputs: hiddenInputs,
+		residentProfileId: residentProfileId,
 	}
 }
 
@@ -228,4 +235,40 @@ func GetVipForm(id uint, guestCode string) GetFormResult {
 		fields:       formFields,
 		hiddenInputs: hiddenInputs,
 	}
+}
+
+type RegistrationResult struct {
+	timestamp        time.Time
+	confirmationCode string
+	emailIdentifier  string
+}
+
+func RegisterVehicle(formParams map[string]string, propertyId uint, residentProfileId uint, hiddenParams []string) (bool, RegistrationResult) {
+	body := url.Values{}
+	body.Set("propertySource", "parking-snap")
+	body.Set("propertyIdSelected", strconv.FormatUint(uint64(propertyId), 10))
+	body.Set("residentProfileId", strconv.FormatUint(uint64(residentProfileId), 10))
+
+	// Some parameters in the form are hidden, so they're just set empty to mimic the browser's behavior
+	for _, hiddenParam := range hiddenParams {
+		body.Set(hiddenParam, "")
+	}
+
+	// These parameters are actively used in the form
+	for key, value := range formParams {
+		body.Set(key, value)
+	}
+
+	req := BuildRequestWithBody("GET", "/register-vehicle-vip-process", nil, strings.NewReader(body.Encode()))
+	SetTypicalHeaders(req, nil, nil, false)
+
+	res, _ := doRequest(req)
+
+	html, _ := io.ReadAll(res.Body)
+	htmlString := string(html)
+
+	// TODO: Parsing of success/failure
+	log.Debugf("RegisterVehicle response: %s", htmlString)
+
+	return (false, nil)
 }
