@@ -158,8 +158,9 @@ func main() {
 	log.Infof("Redis connection established (%s)", ping_result)
 
 	command := ""
-	if len(os.Args) > 1 {
-		command = os.Args[1]
+	args := flag.Args()
+	if len(args) > 1 {
+		command = args[1]
 	}
 
 	switch command {
