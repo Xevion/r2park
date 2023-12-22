@@ -96,14 +96,17 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 				}
 			}
 		default:
+			// An option was focused, but it does not have a handler.
+			var focusedOption *discordgo.ApplicationCommandInteractionDataOption
 			focusedIndex := 0
 			for i, option := range data.Options {
 				if option.Focused {
+					focusedOption = option
 					focusedIndex = i
 					break
 				}
 			}
-			log.WithFields(logrus.Fields{"focusedIndex": focusedIndex}).Warn("Unhandled autocomplete option")
+			log.WithFields(logrus.Fields{"focusedIndex": focusedIndex, "focusedOption": focusedOption.Name, "focusedOption.value": focusedOption.Value}).Warn("Unhandled autocomplete option")
 			return
 		}
 
@@ -278,6 +281,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		// 	},
 		// })
 
+	// Autocomplete is used to provide the user with a list of locations to choose from
 	case discordgo.InteractionApplicationCommandAutocomplete:
 		data := interaction.ApplicationCommandData()
 		var choices []*discordgo.ApplicationCommandOptionChoice
@@ -299,6 +303,20 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 					Value: strconv.Itoa(int(location.id)),
 				}
 			}
+
+		default:
+			// An option was focused, but it does not have a handler.
+			var focusedOption *discordgo.ApplicationCommandInteractionDataOption
+			focusedIndex := 0
+			for i, option := range data.Options {
+				if option.Focused {
+					focusedOption = option
+					focusedIndex = i
+					break
+				}
+			}
+
+			log.WithFields(logrus.Fields{"focusedIndex": focusedIndex, "focusedOption": focusedOption.Name, "focusedOption.value": focusedOption.Value}).Warn("Unhandled autocomplete option")
 		}
 
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
