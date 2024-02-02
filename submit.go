@@ -8,7 +8,7 @@ import (
 
 func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
 	// TODO: Pull in all parameters from the form
-	// TOOD: Pull in all hidden parameters form database
+	// TODO: Pull in all hidden parameters form database
 	// TODO: Pull in resident ID from database
 
 	err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
@@ -31,11 +31,11 @@ func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.Int
 	email := dataByCustomID["email"].(*discordgo.TextInput).Value
 	log.Infof("Email: %s", email)
 
-	// TOOD: Submit registration request to API
+	// TODO: Submit registration request to API
 	// TODO: Edit response to indicate success/failure
-	// TOOD: On success, provide a button to submit email confirmation
-
+	// TODO: On success, provide a button to submit email confirmation
 	// TODO: Validate license plate
+
 	// session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 	// 	Type: discordgo.InteractionResponseChannelMessageWithSource,
 	// 	Data: &discordgo.InteractionResponseData{

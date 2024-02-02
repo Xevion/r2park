@@ -276,3 +276,31 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 
 	return false, nil
 }
+
+// RegisterEmailConfirmation sends a request to the server to send a confirmation email regarding a vehicle's registration.
+// Example Parameters: email=xevion@xevion.dev, vehicleId=63283, propertyId=63184
+func RegisterEmailConfirmation(email string, vehicleId string, propertyId string) (bool, error) {
+	params := map[string]string{
+		"email":          email,
+		"vehicleId":      vehicleId,
+		"propertyId":     propertyId,
+		"propertySource": "parking-snap",
+	}
+
+	req := BuildRequestWithBody("GET", "/register-vehicle-confirmation-process", params, nil)
+	SetTypicalHeaders(req, nil, nil, false)
+
+	res, _ := doRequest(req)
+	if res.StatusCode != 200 {
+		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
+	}
+
+	html, _ := io.ReadAll(res.Body)
+	htmlString := string(html)
+
+	if htmlString == "ok" {
+		return true, nil
+	}
+
+	return false, fmt.Errorf("unexpected response: %s", htmlString)
+}
