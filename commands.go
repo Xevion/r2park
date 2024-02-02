@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/zekroTJA/timedmap"
@@ -240,9 +241,9 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		}
 
 		// Convert the form into message components for a modal presented to the user
-		registrationFormComponents := FormToComponents(form)
+		registrationFormComponents := FormToModalComponents(form)
 
-		// The message ID of the original interaction is used as the identifier for the registration context (uint64)
+		// The ID of the original interaction is used as the identifier for the registration context (uint64)
 		registerIdentifier, parseErr := strconv.ParseUint(interaction.ID, 10, 64)
 		if parseErr != nil {
 			HandleError(session, interaction, parseErr, "Error occurred while parsing interaction message identifier")
@@ -255,47 +256,46 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			requiredFormKeys: lo.Map(form.fields, func(field Field, _ int) string {
 				return field.id
 			}),
-			residentId: 0,
+			residentId: 0, // TODO: Find where this comes from, what it is, etc.
 		}, time.Hour)
 
-		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
+		registrationFormComponents = append(registrationFormComponents, discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{
+				discordgo.TextInput{
+					CustomID:  "email",
+					Label:     "Email Address (for confirmation)",
+					Style:     discordgo.TextInputShort,
+					Required:  false,
+					MinLength: 1,
+				},
+			}})
+
+		response := discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
 			Data: &discordgo.InteractionResponseData{
-				CustomID:   "register:" + interaction.Message.ID,
+				CustomID:   "register:" + interaction.ID,
 				Title:      "Vehicle Registration",
 				Components: registrationFormComponents,
 			},
-		})
-		if err != nil {
-			panic(err)
 		}
 
-		// TODO: Validate license plate
-		// session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-		// 	Type: discordgo.InteractionResponseChannelMessageWithSource,
-		// 	Data: &discordgo.InteractionResponseData{
-		// 		Embeds: []*discordgo.MessageEmbed{
-		// 			{
-		// 				Footer: &discordgo.MessageEmbedFooter{
-		// 					Text: GetFooterText(),
-		// 				},
-		// 				Description: "testing 123",
-		// 				Fields:      []*discordgo.MessageEmbedField{},
-		// 			},
-		// 		},
-		// 		AllowedMentions: &discordgo.MessageAllowedMentions{},
-		// 	},
-		// })
+		err := session.InteractionRespond(interaction.Interaction, &response)
+		if err != nil {
+			log.WithField("dump", spew.Sdump(response)).Error(err)
+		}
 
 	// Autocomplete is used to provide the user with a list of locations to choose from
 	case discordgo.InteractionApplicationCommandAutocomplete:
 		data := interaction.ApplicationCommandData()
 		var choices []*discordgo.ApplicationCommandOptionChoice
 
-		LocationOption := data.Options[0]
+		// Find the focused option
+		focusedOption, _ := lo.Find(data.Options, func(option *discordgo.ApplicationCommandInteractionDataOption) bool {
+			return option.Focused
+		})
 
-		switch {
-		case LocationOption.Focused:
+		switch focusedOption.Name {
+		case LocationOption.Name:
 			// Seed value is based on the user ID + a 15 minute interval)
 			user_id, _ := strconv.Atoi(interaction.Member.User.ID)
 			seed_value := int64(user_id) + (time.Now().Unix() / 15 * 60)
@@ -312,17 +312,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 
 		default:
 			// An option was focused, but it does not have a handler.
-			var focusedOption *discordgo.ApplicationCommandInteractionDataOption
-			focusedIndex := 0
-			for i, option := range data.Options {
-				if option.Focused {
-					focusedOption = option
-					focusedIndex = i
-					break
-				}
-			}
-
-			log.WithFields(logrus.Fields{"focusedIndex": focusedIndex, "focusedOption": focusedOption.Name, "focusedOption.value": focusedOption.Value}).Warn("Unhandled autocomplete option")
+			log.WithFields(logrus.Fields{"focusedOption": focusedOption.Name, "focusedOption.value": focusedOption.Value}).Warn("Unhandled autocomplete option")
 		}
 
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
@@ -331,6 +321,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 				Choices: choices, // This is basically the whole purpose of autocomplete interaction - return custom options to the user.
 			},
 		})
+
 		if err != nil {
 			panic(err)
 		}
