@@ -2,6 +2,19 @@
 
 A Discord bot for easily registering parking at the Register2Park parking system.
 
+## Setup
+
+Environment variables are the preferred way of authenticating the bot's various connections. Place a `.env` file in the root of the project with the following variables:
+
+```
+BOT_TOKEN=
+BOT_TARGET_GUILD=
+REDIS_HOST=
+REDIS_PASSWORD=
+```
+
+## Process
+
 - Invoke the registration command on any location.
 - If a guest code is required, the bot will error and prompt for it.
 - If not required, or if invoked with a guest code, the bot will query R2P for the location's registration fields, such as make/model/plate/aptnum.
