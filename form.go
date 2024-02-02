@@ -5,8 +5,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// FormToComponents converts the form requested into usable modal components.
-func FormToComponents(form GetFormResult) []discordgo.MessageComponent {
+// FormToModalComponents converts the form requested into usable modal components.
+func FormToModalComponents(form GetFormResult) []discordgo.MessageComponent {
 	components := make([]discordgo.MessageComponent, 0, 3)
 
 	for _, field := range form.fields {
@@ -54,6 +54,7 @@ func FormToComponents(form GetFormResult) []discordgo.MessageComponent {
 			}
 		case "vehicleLicensePlateConfirm":
 			log.Debug("Ignored field \"vehicleLicensePlateConfirm\"")
+			continue
 		default:
 			log.Warnf("unexpected field handled for \"%s\" (%v, %s)", form.propertyName, field.id, field.text)
 			component = discordgo.TextInput{
