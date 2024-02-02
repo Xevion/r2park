@@ -6,10 +6,12 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 	"github.com/zekroTJA/timedmap"
 )
 
+// In order for the modal submission to be useful, the context for it's initial request must be stored.
 var SubmissionContexts = timedmap.New(5 * time.Minute)
 
 var CodeCommandDefinition = &discordgo.ApplicationCommand{
@@ -122,25 +124,29 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 	}
 }
 
-var RegisterCommandDefinition = &discordgo.ApplicationCommand{
-	Name:        "register",
-	Description: "Register a vehicle for parking",
-	Options: []*discordgo.ApplicationCommandOption{
-		{
-			Type:         discordgo.ApplicationCommandOptionString,
-			Name:         "location",
-			Description:  "The complex to register with",
-			Required:     true,
-			Autocomplete: true,
+var (
+	LocationOption = &discordgo.ApplicationCommandOption{
+		Type:         discordgo.ApplicationCommandOptionString,
+		Name:         "location",
+		Description:  "The complex to register with",
+		Required:     true,
+		Autocomplete: true,
+	}
+	GuestCodeOption = &discordgo.ApplicationCommandOption{
+		Type:        discordgo.ApplicationCommandOptionString,
+		Name:        "code",
+		Description: "The guest code, if required",
+		Required:    false,
+	}
+	RegisterCommandDefinition = &discordgo.ApplicationCommand{
+		Name:        "register",
+		Description: "Register a vehicle for parking",
+		Options: []*discordgo.ApplicationCommandOption{
+			LocationOption,
+			GuestCodeOption,
 		},
-		{
-			Type:        discordgo.ApplicationCommandOptionString,
-			Name:        "code",
-			Description: "The guest code, if required",
-			Required:    false,
-		},
-	},
-}
+	}
+)
 
 func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.InteractionCreate) {
 	log := logrus.WithFields(logrus.Fields{
@@ -160,14 +166,15 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			return
 		}
 
-		var form GetFormResult
-		var code string
 		var useStoredCode bool
+		var code string
 
-		guestCodeProvided := len(data.Options) > 1
-		if guestCodeProvided {
-			code = data.Options[1].StringValue()
-		}
+		// Check if a guest code was provided (and set it)
+		_, guestCodeProvided := lo.Find(data.Options, func(option *discordgo.ApplicationCommandInteractionDataOption) bool {
+			code = option.StringValue()
+			return option.Name == GuestCodeOption.Name
+		})
+
 		userId, parseErr := strconv.Atoi(interaction.Member.User.ID)
 		if parseErr != nil {
 			HandleError(session, interaction, parseErr, "Error occurred while parsing user id")
@@ -179,7 +186,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 
 		// TODO: Add case for when guest code is provided but not required
 
-		// Circumstane under which error is certain
+		// Circumstance under which error is certain
 		if !guestCodeProvided && guestCodeCondition == GuestCodeNotRequired {
 			// A guest code could be stored, so check for it.
 			log.WithField("location", location_id).Debug("No guest code provided for location, but one is not required. Checking for stored code.")
@@ -200,6 +207,8 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			}
 		}
 
+		// Get the form for the location
+		var form GetFormResult
 		if guestCodeProvided {
 			form = GetVipForm(uint(location_id), code)
 
@@ -207,7 +216,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			if form.requireGuestCode {
 				// Handling is the same for both cases, but the message differs & the code is removed if it was stored.
 				if useStoredCode {
-					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one stored was not valid & deleted.")
+					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one stored was not valid (and subsequently deleted).")
 					RemoveCode(int64(location_id), int(userId))
 				} else {
 					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one provided was not valid.")
@@ -233,23 +242,20 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		// Convert the form into message components for a modal presented to the user
 		registrationFormComponents := FormToComponents(form)
 
-		// The message ID of the original interaction is used as the identifier for the registration context (uin664)
-		registerIdentifier, parseErr := strconv.ParseUint(interaction.Message.ID, 10, 64)
+		// The message ID of the original interaction is used as the identifier for the registration context (uint64)
+		registerIdentifier, parseErr := strconv.ParseUint(interaction.ID, 10, 64)
 		if parseErr != nil {
 			HandleError(session, interaction, parseErr, "Error occurred while parsing interaction message identifier")
 		}
 
-		requiredFormKeys := make([]string, len(form.fields))
-		for i, field := range form.fields {
-			requiredFormKeys[i] = field.id
-		}
-
 		// Store the registration context for later use
 		SubmissionContexts.Set(registerIdentifier, &RegisterContext{
-			hiddenKeys:       form.hiddenInputs,
-			propertyId:       uint(location_id),
-			requiredFormKeys: requiredFormKeys,
-			residentId:       0,
+			hiddenKeys: form.hiddenInputs,
+			propertyId: uint(location_id),
+			requiredFormKeys: lo.Map(form.fields, func(field Field, _ int) string {
+				return field.id
+			}),
+			residentId: 0,
 		}, time.Hour)
 
 		err := session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
