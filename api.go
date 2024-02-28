@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,8 @@ var (
 	requestCounter     uint
 	lastReload         time.Time
 	parsePattern       = regexp.MustCompile(`\s*(.+)\n\s+(.+)\n\s+(\d+)\s*`)
+	vehicleIdPattern   = regexp.MustCompile(`data-vehicle-id="(\d+)"`)
+	timestampPattern   = regexp.MustCompile(`\d{4}-\d{2}-\d{2} \d{2}:\d{2} [AP]M`)
 	cachedLocations    []Location
 	cachedLocationsMap map[uint]Location
 	cacheExpiry        time.Time
@@ -242,12 +245,13 @@ func GetVipForm(id uint, guestCode string) GetFormResult {
 }
 
 type RegistrationResult struct {
+	success          bool
 	timestamp        time.Time
 	confirmationCode string
-	emailIdentifier  string
+	vehicleId        string
 }
 
-func RegisterVehicle(formParams map[string]string, propertyId uint, residentProfileId uint, hiddenParams []string) (bool, *RegistrationResult) {
+func RegisterVehicle(formParams map[string]string, propertyId uint, residentProfileId uint, hiddenParams []string) (*RegistrationResult, error) {
 	body := url.Values{}
 	body.Set("propertySource", "parking-snap")
 	body.Set("propertyIdSelected", strconv.FormatUint(uint64(propertyId), 10))
@@ -263,18 +267,96 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 		body.Set(key, value)
 	}
 
+	// Build the request
 	req := BuildRequestWithBody("GET", "/register-vehicle-vip-process", nil, strings.NewReader(body.Encode()))
 	SetTypicalHeaders(req, nil, nil, false)
 
-	res, _ := doRequest(req)
+	// Send the request
+	res, err := doRequest(req)
+	if err != nil {
+		return nil, err
+	}
 
-	html, _ := io.ReadAll(res.Body)
+	// Read the response body
+	html, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
 	htmlString := string(html)
 
-	// TODO: Parsing of success/failure
-	log.Debugf("RegisterVehicle response: %s", htmlString)
+	// Success can be measured with the presence of either "Approved" or "Denied" (if neither, it's an error)
+	if strings.Contains(htmlString, "Approved") {
+		result := &RegistrationResult{success: true}
 
-	return false, nil
+		// Search for 'data-vehicle-id' with regex
+		vehicleIdMatches := vehicleIdPattern.FindStringSubmatch(htmlString)
+		if len(vehicleIdMatches) > 1 {
+			result.vehicleId = vehicleIdMatches[1]
+		}
+
+		// Find the confirmation code
+		doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(htmlString))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse HTML of approved registration result partial: %w", err)
+		}
+
+		// Look for a 'p' tag that contains the text 'Confirmation Code:'
+		var sibling *goquery.Selection
+		doc.Find("div.circle-inner > p").Each(func(i int, s *goquery.Selection) {
+			// If we've already found the element, stop searching
+			if sibling != nil {
+				return
+			} else if strings.Contains(s.Text(), "Confirmation Code:") {
+				sibling = s
+			}
+		})
+
+		// The confirmation code is the next sibling of the 'p' tag
+		if sibling != nil {
+			result.confirmationCode = sibling.Next().Text()
+		}
+
+		// Find timestamp: look for a 'strong' tag that contains 'Registration Date/Time:' inside a p, inside a div.circle-inner
+		var parent *goquery.Selection
+		doc.Find("div.circle-inner > p").Each(func(i int, s *goquery.Selection) {
+			// If we've already found the element, stop searching
+			if parent != nil {
+				return
+			} else if strings.Contains(s.Text(), "Registration Date/Time:") {
+				parent = s.Parent()
+			}
+		})
+
+		// The timestamp is a untagged text node inside the p tag
+		if parent != nil {
+			// Get the raw text of the parent, then find the timestamp within it
+			rawText := parent.Text()
+			match := timestampPattern.FindString(rawText)
+
+			// If we found a match, parse it into a time.Time
+			if match != "" {
+				timestamp, err := time.Parse("2006-01-02 03:04 PM", match)
+
+				// Silently log the error if timestamp parsing fails
+				if err != nil {
+					log.Errorf("failed to parse timestamp: %v", err)
+					result.timestamp = time.Time{}
+				} else {
+					result.timestamp = timestamp
+				}
+			}
+		}
+
+		return result, nil
+	}
+
+	// Confirmed denial, cleanly return
+	if strings.Contains(htmlString, "Denied") {
+		// TODO: Find and parse timestamp
+		return &RegistrationResult{success: false}, nil
+	}
+
+	return nil, errors.New("unexpected response")
 }
 
 // RegisterEmailConfirmation sends a request to the server to send a confirmation email regarding a vehicle's registration.
