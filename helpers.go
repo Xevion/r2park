@@ -172,15 +172,14 @@ func GetFooterText() string {
 
 // HandleError(session, interaction, parse_err)
 func HandleError(session *discordgo.Session, interaction *discordgo.InteractionCreate, err error, message string) {
-	if err != nil {
-		log.Errorf("%s (%v)", message, err)
-	}
+	log.Errorf("%s (%v)", message, err)
 
 	err = session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds: []*discordgo.MessageEmbed{
 				{
+					Color: 0xff0000,
 					Footer: &discordgo.MessageEmbedFooter{
 						Text: GetFooterText(),
 					},
