@@ -181,7 +181,6 @@ func main() {
 	switch command {
 	case "scan":
 		log.Info("Scanning...")
-		Scan()
 	case "bot":
 	default:
 		log.Info("Starting bot...")
