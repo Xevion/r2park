@@ -185,6 +185,7 @@ func GetForm(id uint) GetFormResult {
 		}
 	}
 
+	// TODO: Validate that vehicleInformationVIP is actually real for non-VIP properties
 	// Get the resident profile
 	nextButton := doc.Find("#vehicleInformationVIP").First()
 	residentProfileId, _ := nextButton.Attr("data-resident-profile-id")
@@ -236,11 +237,19 @@ func GetVipForm(id uint, guestCode string) GetFormResult {
 	title := titleElement.Text()
 	address := strings.TrimSpace(titleElement.Next().Text())
 
+	// Acquire the resident profile ID
+	nextButton := doc.Find("#vehicleInformationVIP").First()
+	residentProfileId, exists := nextButton.Attr("data-resident-profile-id")
+	if !exists {
+		return GetFormResult{err: errors.New("resident profile ID not found")}
+	}
+
 	return GetFormResult{
-		propertyName: title,
-		address:      address,
-		fields:       formFields,
-		hiddenInputs: hiddenInputs,
+		propertyName:      title,
+		address:           address,
+		fields:            formFields,
+		hiddenInputs:      hiddenInputs,
+		residentProfileId: residentProfileId,
 	}
 }
 
