@@ -2,6 +2,7 @@ package main
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/samber/lo"
@@ -31,7 +32,6 @@ func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.Int
 	})
 
 	log.Infof("dataByCustomID: %+v", dataByCustomID)
-	// email := dataByCustomID["email"].(*discordgo.TextInput).Value
 
 	// Collect the form parameters provided by the user
 	formParams := map[string]string{}
@@ -44,14 +44,21 @@ func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.Int
 		formParams[fieldName] = component.(*discordgo.TextInput).Value
 	}
 
-	// The ID of the original interaction is used as the identifier for the registration context (uint64)
-	registerIdentifier, parseErr := strconv.ParseUint(interaction.ID, 10, 64)
+	// The custom ID of the interaction response is the original identifier (register:\d+)
+	_, identifier, _ := strings.Cut(data.CustomID, ":")
+	originalIdentifier, parseErr := strconv.ParseUint(identifier, 10, 64)
 	if parseErr != nil {
-		HandleError(session, interaction, parseErr, "Error occurred while parsing interaction message identifier")
+		HandleError(session, interaction, parseErr, "Failed to parse original identifier")
+		return
 	}
 
-	// Get the context that we stored prior to emitting the modal
-	context := SubmissionContexts.GetValue(registerIdentifier).(*RegisterContext)
+	// Get the contextInterface that we stored prior to emitting the modal
+	contextInterface := SubmissionContexts.GetValue(originalIdentifier)
+	if contextInterface == nil {
+		HandleError(session, interaction, nil, "Failed to retrieve registration context")
+		return
+	}
+	context := contextInterface.(*RegisterContext)
 
 	// Register the vehicle
 	result, err := RegisterVehicle(formParams, context.propertyId, context.residentId, context.hiddenKeys)
@@ -61,7 +68,20 @@ func RegisterModalHandler(session *discordgo.Session, interaction *discordgo.Int
 		return
 	}
 
-	log.Infof("RegisterVehicle result: %+v", result)
+	// Send email confirmation if an email was provided
+	email := dataByCustomID["email"].(*discordgo.TextInput).Value
+	if email != "" {
+		success, err := RegisterEmailConfirmation(email, result.vehicleId, strconv.Itoa(int(context.propertyId)))
+		if err != nil {
+			HandleError(session, interaction, err, "Failed to send email confirmation")
+			return
+		}
+
+		if !success {
+			HandleError(session, interaction, nil, "Failed to send email confirmation")
+			return
+		}
+	}
 
 	// TODO: Edit response to indicate success/failure
 	// TODO: Validate license plate
