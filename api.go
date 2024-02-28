@@ -277,7 +277,7 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 	}
 
 	// Build the request
-	req := BuildRequestWithBody("GET", "/register-vehicle-vip-process", nil, strings.NewReader(body.Encode()))
+	req := BuildRequestWithBody("POST", "/register-vehicle-vip-process", nil, strings.NewReader(body.Encode()))
 	SetTypicalHeaders(req, nil, nil, false)
 
 	// Send the request
