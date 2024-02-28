@@ -249,6 +249,19 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			HandleError(session, interaction, parseErr, "Error occurred while parsing interaction message identifier")
 		}
 
+		// Parse resident profile ID
+		residentProfileId, parseErr := strconv.ParseUint(form.residentProfileId, 10, 64)
+		if parseErr != nil {
+			HandleError(session, interaction, parseErr, "Error occurred while parsing resident profile identifier")
+		}
+
+		// Log the registration context at debug
+		log.WithFields(logrus.Fields{
+			"registerIdentifier": registerIdentifier,
+			"propertyId":         location_id,
+			"residentId":         form.residentProfileId,
+		})
+
 		// Store the registration context for later use
 		SubmissionContexts.Set(registerIdentifier, &RegisterContext{
 			hiddenKeys: form.hiddenInputs,
@@ -256,7 +269,7 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			requiredFormKeys: lo.Map(form.fields, func(field Field, _ int) string {
 				return field.id
 			}),
-			residentId: 0, // TODO: Find where this comes from, what it is, etc.
+			residentId: uint(residentProfileId),
 		}, time.Hour)
 
 		registrationFormComponents = append(registrationFormComponents, discordgo.ActionsRow{
