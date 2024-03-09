@@ -156,7 +156,7 @@ func main() {
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		log.WithField("error", err).Panic("Error loading .env file")
+		log.WithField("error", err).Warn("Failed to load .env file")
 	}
 
 	opt := &redis.Options{
