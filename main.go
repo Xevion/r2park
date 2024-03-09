@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"os"
 	"os/signal"
@@ -148,11 +149,22 @@ func Bot() {
 	defer log.Warn("Graceful shutdown complete")
 }
 
+type OutputSplitter struct{}
+
+func (splitter *OutputSplitter) Write(p []byte) (n int, err error) {
+	if bytes.Contains(p, []byte("level=error")) {
+		return os.Stderr.Write(p)
+	}
+	return os.Stdout.Write(p)
+}
+
 func main() {
 	log.SetFormatter(&log.TextFormatter{
 		TimestampFormat: "2006-01-02 15:04:05",
 		FullTimestamp:   true,
 	})
+
+	log.SetOutput(&OutputSplitter{})
 
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
