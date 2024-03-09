@@ -1,10 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -23,8 +23,9 @@ var (
 	modalHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"register": RegisterModalHandler,
 	}
-	db        *redis.Client
-	debugFlag = flag.Bool("debug", false, "Enable debug logging")
+	db           *redis.Client
+	debugFlag    = flag.Bool("debug", false, "Enable debug logging")
+	levelPattern = regexp.MustCompile(`level=(error|fatal|panic|warning)`)
 )
 
 func init() {
@@ -152,7 +153,8 @@ func Bot() {
 type OutputSplitter struct{}
 
 func (splitter *OutputSplitter) Write(p []byte) (n int, err error) {
-	if bytes.Contains(p, []byte("level=error")) {
+	// Levels matched are contained within the OR'd group (error|fatal|panic|warning)
+	if levelPattern.Match(p) {
 		return os.Stderr.Write(p)
 	}
 	return os.Stdout.Write(p)
