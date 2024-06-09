@@ -293,20 +293,25 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 	}
 	htmlString := string(html)
 
-	// Success can be measured with the presence of either "Approved" or "Denied" (if neither, it's an error)
-	if strings.Contains(htmlString, "Approved") {
-		result := &RegistrationResult{success: true}
+	result := &RegistrationResult{success: strings.Contains(htmlString, "Approved")}
 
+	// Sanity check that a proper result was returned
+	if !result.success && !strings.Contains(htmlString, "Denied") {
+		return nil, fmt.Errorf("unexpected response: %s", htmlString)
+	}
+
+	// Parse the HTML response
+	doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(htmlString))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HTML of approved registration result partial: %w", err)
+	}
+
+	// Success can be measured with the presence of either "Approved" or "Denied" (if neither, it's an error)
+	if result.success {
 		// Search for 'data-vehicle-id' with regex
 		vehicleIdMatches := vehicleIdPattern.FindStringSubmatch(htmlString)
 		if len(vehicleIdMatches) > 1 {
 			result.vehicleId = vehicleIdMatches[1]
-		}
-
-		// Find the confirmation code
-		doc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(htmlString))
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse HTML of approved registration result partial: %w", err)
 		}
 
 		// Look for a 'p' tag that contains the text 'Confirmation Code:'
@@ -324,48 +329,41 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 		if sibling != nil {
 			result.confirmationCode = sibling.Next().Text()
 		}
+	}
 
-		// Find timestamp: look for a 'strong' tag that contains 'Registration Date/Time:' inside a p, inside a div.circle-inner
-		var parent *goquery.Selection
-		doc.Find("div.circle-inner > p").Each(func(i int, s *goquery.Selection) {
-			// If we've already found the element, stop searching
-			if parent != nil {
-				return
-			} else if strings.Contains(s.Text(), "Registration Date/Time:") {
-				parent = s.Parent()
-			}
-		})
-
-		// The timestamp is a untagged text node inside the p tag
+	// Find timestamp: look for a 'strong' tag that contains 'Registration Date/Time:' inside a p, inside a div.circle-inner
+	var parent *goquery.Selection
+	doc.Find("div.circle-inner > p").Each(func(i int, s *goquery.Selection) {
+		// If we've already found the element, stop searching
 		if parent != nil {
-			// Get the raw text of the parent, then find the timestamp within it
-			rawText := parent.Text()
-			match := timestampPattern.FindString(rawText)
+			return
+		} else if strings.Contains(s.Text(), "Date/Time:") {
+			// Will start with 'Denied' or 'Registration'
+			parent = s.Parent()
+		}
+	})
 
-			// If we found a match, parse it into a time.Time
-			if match != "" {
-				timestamp, err := time.Parse("2006-01-02 03:04 PM", match)
+	// The timestamp is a untagged text node inside the p tag
+	if parent != nil {
+		// Get the raw text of the parent, then find the timestamp within it
+		rawText := parent.Text()
+		match := timestampPattern.FindString(rawText)
 
-				// Silently log the error if timestamp parsing fails
-				if err != nil {
-					log.Errorf("failed to parse timestamp: %v", err)
-					result.timestamp = time.Time{}
-				} else {
-					result.timestamp = timestamp
-				}
+		// If we found a match, parse it into a time.Time
+		if match != "" {
+			timestamp, err := time.Parse("2006-01-02 03:04 PM", match)
+
+			// Silently log the error if timestamp parsing fails
+			if err != nil {
+				log.Errorf("failed to parse timestamp: %v", err)
+				result.timestamp = time.Time{}
+			} else {
+				result.timestamp = timestamp
 			}
 		}
-
-		return result, nil
 	}
 
-	// Confirmed denial, cleanly return
-	if strings.Contains(htmlString, "Denied") {
-		// TODO: Find and parse timestamp
-		return &RegistrationResult{success: false}, nil
-	}
-
-	return nil, errors.New("unexpected response")
+	return result, nil
 }
 
 // RegisterEmailConfirmation sends a request to the server to send a confirmation email regarding a vehicle's registration.
