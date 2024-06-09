@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 
 // In order for the modal submission to be useful, the context for it's initial request must be stored.
 var SubmissionContexts = timedmap.New(5 * time.Minute)
+
+var codePattern = regexp.MustCompile(`^[a-zA-Z0-9]{4,12}$`)
 
 var CodeCommandDefinition = &discordgo.ApplicationCommand{
 	Name:        "code",
@@ -51,9 +54,12 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 		code := data.Options[1].StringValue()
 		userId, _ := strconv.Atoi(interaction.Member.User.ID)
 
-		// TODO: Validate that the location exists
-		// TODO: Validate that the code has no invalid characters
-		already_set := StoreCode(code, int64(location_id), user_id)
+		// Validate that the location exists
+		if !LocationExists(int64(locationId)) {
+			HandleError(session, interaction, nil, "The location provided does not exist.")
+			return
+		}
+
 		// Validate that the code has no invalid characters
 		if !codePattern.MatchString(code) {
 			HandleError(session, interaction, nil, "The code provided contains invalid characters.")

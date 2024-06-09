@@ -4,6 +4,13 @@ import (
 	"fmt"
 )
 
+// LocationExists checks if a location identifier is valid (as known by the cache).
+// Cache rarely will change, so this is a good way to check if a location is valid.
+func LocationExists(location int64) bool {
+	_, ok := cachedLocationsMap[uint(location)]
+	return ok
+}
+
 func StoreCode(code string, location int64, member_id int) bool {
 	key := fmt.Sprintf("code:%d:%d", location, member_id)
 	already_set := db.Exists(key).Val() == 1
