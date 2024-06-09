@@ -90,10 +90,10 @@ func doRequest(request *http.Request) (*http.Response, error) {
 }
 
 // GetRandomItems returns N random items from the given array.
-// The seed_value is used to control the output.
+// The seedValue is used to control the output.
 // If the array is not a slice, an error is returned.
-func GetRandomItems[T any](arr []T, N int, seed_value int64) ([]T, error) {
-	randgen := rand.New(rand.NewSource(seed_value))
+func GetRandomItems[T any](arr []T, N int, seedValue int64) ([]T, error) {
+	randgen := rand.New(rand.NewSource(seedValue))
 	arrValue := reflect.ValueOf(arr)
 
 	if arrValue.Kind() != reflect.Slice {

@@ -47,19 +47,26 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 	case discordgo.InteractionApplicationCommand:
 		data := interaction.ApplicationCommandData()
 
-		location_id, _ := strconv.Atoi(data.Options[0].StringValue())
+		locationId, _ := strconv.Atoi(data.Options[0].StringValue())
 		code := data.Options[1].StringValue()
-		user_id, _ := strconv.Atoi(interaction.Member.User.ID)
+		userId, _ := strconv.Atoi(interaction.Member.User.ID)
 
 		// TODO: Validate that the location exists
 		// TODO: Validate that the code has no invalid characters
 		already_set := StoreCode(code, int64(location_id), user_id)
+		// Validate that the code has no invalid characters
+		if !codePattern.MatchString(code) {
+			HandleError(session, interaction, nil, "The code provided contains invalid characters.")
+			return
+		}
+
+		alreadySet := StoreCode(code, int64(locationId), userId)
 		responseText := "Your guest code at \"%s\" has been set."
-		if already_set {
+		if alreadySet {
 			responseText = "Your guest code at \"%s\" has been updated."
 		}
 
-		location := cachedLocationsMap[uint(location_id)]
+		location := cachedLocationsMap[uint(locationId)]
 
 		session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -86,9 +93,9 @@ func CodeCommandHandler(session *discordgo.Session, interaction *discordgo.Inter
 		switch {
 		case LocationOption.Focused:
 			// Seed value is based on the user ID + a 15 minute interval)
-			user_id, _ := strconv.Atoi(interaction.Member.User.ID)
-			seed_value := int64(user_id) + (time.Now().Unix() / 15 * 60)
-			locations := FilterLocations(GetLocations(), data.Options[0].StringValue(), 25, seed_value)
+			userId, _ := strconv.Atoi(interaction.Member.User.ID)
+			seedValue := int64(userId) + (time.Now().Unix() / 15 * 60)
+			locations := FilterLocations(GetLocations(), data.Options[0].StringValue(), 25, seedValue)
 
 			// Convert the locations to choices
 			choices = make([]*discordgo.ApplicationCommandOptionChoice, len(locations))
@@ -161,9 +168,9 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 	case discordgo.InteractionApplicationCommand:
 		data := interaction.ApplicationCommandData()
 
-		location_id, parse_err := strconv.Atoi(data.Options[0].StringValue())
-		if parse_err != nil {
-			HandleError(session, interaction, parse_err, "Error occurred while parsing location id")
+		locationId, parseErr := strconv.Atoi(data.Options[0].StringValue())
+		if parseErr != nil {
+			HandleError(session, interaction, parseErr, "Error occurred while parsing location id")
 			return
 		}
 
@@ -183,15 +190,15 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		}
 
 		// Check if a guest code is required for this location
-		guestCodeCondition := GetCodeRequirement(int64(location_id))
+		guestCodeCondition := GetCodeRequirement(int64(locationId))
 
 		// TODO: Add case for when guest code is provided but not required
 
 		// Circumstance under which error is certain
 		if !guestCodeProvided && guestCodeCondition == GuestCodeNotRequired {
 			// A guest code could be stored, so check for it.
-			log.WithField("location", location_id).Debug("No guest code provided for location, but one is not required. Checking for stored code.")
-			code = GetCode(int64(location_id), int(userId))
+			log.WithField("location", locationId).Debug("No guest code provided for location, but one is not required. Checking for stored code.")
+			code = GetCode(int64(locationId), int(userId))
 
 			if code == "" {
 				// No code was stored, error out.
@@ -200,8 +207,8 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 			} else {
 				// Code available, use it.
 				log.WithFields(logrus.Fields{
-					"location_id": location_id,
-					"code":        code,
+					"locationId": locationId,
+					"code":       code,
 				}).Debug("Using stored code for location")
 				guestCodeProvided = true
 				useStoredCode = true
@@ -211,29 +218,29 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		// Get the form for the location
 		var form GetFormResult
 		if guestCodeProvided {
-			form = GetVipForm(uint(location_id), code)
+			form = GetVipForm(uint(locationId), code)
 
 			// requireGuestCode being returned for a VIP form indicates an invalid code.
 			if form.requireGuestCode {
 				// Handling is the same for both cases, but the message differs & the code is removed if it was stored.
 				if useStoredCode {
 					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one stored was not valid (and subsequently deleted).")
-					RemoveCode(int64(location_id), int(userId))
+					RemoveCode(int64(locationId), int(userId))
 				} else {
 					HandleError(session, interaction, nil, ":x: This location requires a guest code and the one provided was not valid.")
 				}
 				return
 			}
 		} else {
-			form = GetForm(uint(location_id))
+			form = GetForm(uint(locationId))
 
 			if form.requireGuestCode {
 				// The code ended up being required, so we mark it as such.
 				if guestCodeCondition == Unknown {
 					log.WithFields(logrus.Fields{
-						"location_id": location_id,
+						"locationId": locationId,
 					}).Debug("Marking location as requiring a guest code")
-					SetCodeRequirement(int64(location_id), true)
+					SetCodeRequirement(int64(locationId), true)
 				}
 				HandleError(session, interaction, nil, ":x: This location requires a guest code.")
 				return
@@ -258,14 +265,14 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		// Log the registration context at debug
 		log.WithFields(logrus.Fields{
 			"registerIdentifier": registerIdentifier,
-			"propertyId":         location_id,
+			"propertyId":         locationId,
 			"residentId":         form.residentProfileId,
 		})
 
 		// Store the registration context for later use
 		SubmissionContexts.Set(registerIdentifier, &RegisterContext{
 			hiddenKeys: form.hiddenInputs,
-			propertyId: uint(location_id),
+			propertyId: uint(locationId),
 			requiredFormKeys: lo.Map(form.fields, func(field Field, _ int) string {
 				return field.id
 			}),
@@ -281,7 +288,8 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 					Required:  false,
 					MinLength: 1,
 				},
-			}})
+			},
+		})
 
 		response := discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseModal,
@@ -310,9 +318,9 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		switch focusedOption.Name {
 		case LocationOption.Name:
 			// Seed value is based on the user ID + a 15 minute interval)
-			user_id, _ := strconv.Atoi(interaction.Member.User.ID)
-			seed_value := int64(user_id) + (time.Now().Unix() / 15 * 60)
-			locations := FilterLocations(GetLocations(), data.Options[0].StringValue(), 25, seed_value)
+			userId, _ := strconv.Atoi(interaction.Member.User.ID)
+			seedValue := int64(userId) + (time.Now().Unix() / 15 * 60)
+			locations := FilterLocations(GetLocations(), data.Options[0].StringValue(), 25, seedValue)
 
 			// Convert the locations to choices
 			choices = make([]*discordgo.ApplicationCommandOptionChoice, len(locations))
@@ -334,7 +342,6 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 				Choices: choices, // This is basically the whole purpose of autocomplete interaction - return custom options to the user.
 			},
 		})
-
 		if err != nil {
 			panic(err)
 		}

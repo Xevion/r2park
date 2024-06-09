@@ -126,9 +126,12 @@ func GetLocations() []Location {
 		return nil
 	}
 
+	// Prepare an array to store the locations
 	cachedLocations = make([]Location, 0, 150)
 
+	// Parse the locations from the HTML
 	doc.Find("input.property").Each(func(i int, s *goquery.Selection) {
+		// Parse the name and address
 		matches := parsePattern.FindStringSubmatch(s.Parent().Text())
 
 		key_attr, _ := s.Attr("data-locate-key")
@@ -136,7 +139,9 @@ func GetLocations() []Location {
 		id, _ := strconv.ParseUint(id_attr, 10, 32)
 
 		cachedLocations = append(cachedLocations, Location{
-			id:      uint(id),
+			// the ID used for the form, actively used in selecting the registration form
+			id: uint(id),
+			// key is not used for anything, but we parse it anyway
 			key:     key_attr,
 			name:    matches[1],
 			address: matches[2] + " " + matches[3],
@@ -186,6 +191,7 @@ func GetForm(id uint) GetFormResult {
 	}
 
 	// TODO: Validate that vehicleInformationVIP is actually real for non-VIP properties
+
 	// Get the resident profile
 	nextButton := doc.Find("#vehicleInformationVIP").First()
 	residentProfileId, _ := nextButton.Attr("data-resident-profile-id")
@@ -293,6 +299,7 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 	}
 	htmlString := string(html)
 
+	// Success can be measured with the presence of either "Approved" or "Denied" (if neither, it's an error)
 	result := &RegistrationResult{success: strings.Contains(htmlString, "Approved")}
 
 	// Sanity check that a proper result was returned
@@ -306,7 +313,7 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 		return nil, fmt.Errorf("failed to parse HTML of approved registration result partial: %w", err)
 	}
 
-	// Success can be measured with the presence of either "Approved" or "Denied" (if neither, it's an error)
+	// Search for attributes thar are only present on success
 	if result.success {
 		// Search for 'data-vehicle-id' with regex
 		vehicleIdMatches := vehicleIdPattern.FindStringSubmatch(htmlString)
@@ -314,8 +321,9 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 			result.vehicleId = vehicleIdMatches[1]
 		}
 
-		// Look for a 'p' tag that contains the text 'Confirmation Code:'
 		var sibling *goquery.Selection
+
+		// Look for a 'p' tag that contains the text 'Confirmation Code:'
 		doc.Find("div.circle-inner > p").Each(func(i int, s *goquery.Selection) {
 			// If we've already found the element, stop searching
 			if sibling != nil {
