@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+
+	"github.com/go-redis/redis"
 )
 
 // LocationExists checks if a location identifier is valid (as known by the cache).
@@ -11,6 +13,7 @@ func LocationExists(location int64) bool {
 	return ok
 }
 
+// StoreCode stores a guest code for a given location and member ID.
 func StoreCode(code string, location int64, member_id int) bool {
 	key := fmt.Sprintf("code:%d:%d", location, member_id)
 	already_set := db.Exists(key).Val() == 1
@@ -19,11 +22,14 @@ func StoreCode(code string, location int64, member_id int) bool {
 	return already_set
 }
 
-func GetCode(location int64, member_id int) string {
+// GetCode returns the guest code for a given location and member ID.
+func GetCode(location int64, member_id int) (string, bool) {
 	key := fmt.Sprintf("code:%d:%d", location, member_id)
-	return db.Get(key).Val()
+	result := db.Get(key)
+	return result.Val(), result.Err() == redis.Nil
 }
 
+// RemoveCode removes a guest code for a given location and member ID.
 func RemoveCode(location int64, member_id int) {
 	key := fmt.Sprintf("code:%d:%d", location, member_id)
 	db.Del(key)

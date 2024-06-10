@@ -204,9 +204,9 @@ func RegisterCommandHandler(session *discordgo.Session, interaction *discordgo.I
 		if !guestCodeProvided && guestCodeCondition == GuestCodeNotRequired {
 			// A guest code could be stored, so check for it.
 			log.WithField("location", locationId).Debug("No guest code provided for location, but one is not required. Checking for stored code.")
-			code = GetCode(int64(locationId), int(userId))
+			code, ok := GetCode(int64(locationId), int(userId))
 
-			if code == "" {
+			if !ok {
 				// No code was stored, error out.
 				HandleError(session, interaction, nil, ":x: This location requires a guest code.")
 				return
