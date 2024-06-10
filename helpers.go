@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -164,9 +165,10 @@ var CommitId = func() string {
 	return strings.Repeat("gubed", 8) // 40 characters
 }()
 
+// GetFooterText returns a string that includes the current time and the commit ID.
 func GetFooterText() string {
 	return fmt.Sprintf("%s (#%s)",
-		time.Now().Format("Jan 2, 2006 3:04:05PM"),
+		time.Now().Format("Jan 2, 2006 3:04:05 PM"),
 		strings.ToLower(CommitId[:7]))
 }
 
@@ -174,22 +176,44 @@ func GetFooterText() string {
 func HandleError(session *discordgo.Session, interaction *discordgo.InteractionCreate, err error, message string) {
 	log.Errorf("%s (%v)", message, err)
 
-	err = session.InteractionRespond(interaction.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Embeds: []*discordgo.MessageEmbed{
-				{
-					Color: 0xff0000,
-					Footer: &discordgo.MessageEmbedFooter{
-						Text: GetFooterText(),
-					},
-					Description: message,
+	// Extract wrapped errors and build embed fields
+	innerErrorFields := make([]*discordgo.MessageEmbedField, 0)
+	innerCount := 0
+	innerError := err
+	for {
+		if innerError == nil {
+			break
+		}
+
+		innerErrorFields = append(innerErrorFields, &discordgo.MessageEmbedField{
+			Name:  "Error",
+			Value: innerError.Error(),
+		})
+		innerCount += 1
+
+		if innerCount == 25 {
+			log.WithField("error", err).Warn("While forming discord error embed in HandleError, reached maximum inner error count while unwrapping.")
+			break
+		}
+
+		innerError = errors.Unwrap(innerError)
+	}
+
+	_, err = session.FollowupMessageCreate(interaction.Interaction, false, &discordgo.WebhookParams{
+		Embeds: []*discordgo.MessageEmbed{
+			{
+				Color:       0xff0000,
+				Title:       "An error has occurred.",
+				Description: message,
+				Footer: &discordgo.MessageEmbedFooter{
+					Text: GetFooterText(),
 				},
+				Fields: innerErrorFields,
 			},
 		},
 	})
 
 	if err != nil {
-		log.Warn("Unable to provide error response to user.", err)
+		log.WithField("error", err).Warn("Unable to provide error response to user.")
 	}
 }
