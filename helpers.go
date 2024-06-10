@@ -186,8 +186,9 @@ func HandleError(session *discordgo.Session, interaction *discordgo.InteractionC
 		}
 
 		innerErrorFields = append(innerErrorFields, &discordgo.MessageEmbedField{
-			Name:  "Error",
-			Value: innerError.Error(),
+			Name: "Error",
+			// limit to 256 characters
+			Value: innerError.Error()[:256],
 		})
 		innerCount += 1
 

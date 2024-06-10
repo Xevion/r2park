@@ -304,7 +304,7 @@ func RegisterVehicle(formParams map[string]string, propertyId uint, residentProf
 
 	// Sanity check that a proper result was returned
 	if !result.success && !strings.Contains(htmlString, "Denied") {
-		return nil, fmt.Errorf("unexpected response: %s", htmlString)
+		return nil, fmt.Errorf("unexpected response: %v - %s", res, htmlString)
 	}
 
 	// Parse the HTML response
@@ -387,8 +387,10 @@ func RegisterEmailConfirmation(email string, vehicleId string, propertyId string
 	req := BuildRequestWithBody("GET", "/register-vehicle-confirmation-process", params, nil)
 	SetTypicalHeaders(req, nil, nil, false)
 
-	res, _ := doRequest(req)
-	if res.StatusCode != 200 {
+	res, err := doRequest(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to send email confirmation request: %w", err)
+	} else if res.StatusCode != 200 {
 		return false, fmt.Errorf("unexpected status code: %d", res.StatusCode)
 	}
 
@@ -399,5 +401,5 @@ func RegisterEmailConfirmation(email string, vehicleId string, propertyId string
 		return true, nil
 	}
 
-	return false, fmt.Errorf("unexpected response: %s", htmlString)
+	return false, fmt.Errorf("unexpected response: %v - %s", res, htmlString)
 }
